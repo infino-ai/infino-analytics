@@ -1,0 +1,13 @@
+{
+  "name": "@infino-ai/analytics",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@infino-ai/analytics-agent": "*",
+    "@infino-ai/analytics-viz-core": "*"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "infino-analytics",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Reference kit for building conversational analytics, visualizations, and dashboards on Infino",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "tsx": "^4.19.0",
+    "@types/node": "^22.0.0"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p apps/web/tsconfig.json",
+    "build": "npm run build -w @infino-ai/analytics-web",
+    "dev": "npm run build -w @infino-ai/analytics-web && npm run dev -w @infino-ai/analytics-server"
+  },
+  "overrides": {
+    "@infino-ai/infino": "^0.5.0"
+  }
+}

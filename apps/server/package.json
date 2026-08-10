@@ -1,0 +1,14 @@
+{
+  "name": "@infino-ai/analytics-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.0",
+    "@infino-ai/analytics": "*",
+    "hono": "^4.6.0"
+  }
+}
