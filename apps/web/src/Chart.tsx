@@ -6,10 +6,14 @@ import type { ChartEvent } from "./api";
 // find columns — never derive names from the SQL or the spec, the server
 // already resolved them against the actual result.
 
-const PALETTE = ["#d23b1e", "#2b50aa", "#1f8a70", "#8f3e97", "#c98a00", "#1b1b1f"];
-const AXIS_COLOR = "#97968f";
-const SPLIT_COLOR = "#e8e6dd";
-const INK = "#1b1b1f";
+// Dark-theme chart palette. Kept in sync with the CSS tokens in styles.css
+// (same names, same intent). Series colors are lifted for legibility on the
+// near-black ground; the first is the vermilion accent.
+const PALETTE = ["#f0532f", "#6f9aff", "#3fbf8f", "#c88ae0", "#e8b34a", "#c9c7c0"];
+const AXIS_COLOR = "#66655f";
+const SPLIT_COLOR = "#2c2c33";
+const INK = "#e9e7e1";
+const SURFACE = "#1f1f25";
 const MAX_TABLE_ROWS = 50;
 
 const nf = new Intl.NumberFormat("en-US");
@@ -124,10 +128,10 @@ function buildOption(event: ChartEvent): echarts.EChartsOption {
     textStyle: { fontFamily: "Fragment Mono, monospace", color: AXIS_COLOR },
     tooltip: {
       trigger: kind === "pie" ? "item" : "axis",
-      backgroundColor: "#ffffff",
-      borderColor: INK,
+      backgroundColor: SURFACE,
+      borderColor: "#3d3d45",
       borderWidth: 1,
-      extraCssText: "box-shadow: 3px 3px 0 #d8d6cd; border-radius: 0;",
+      extraCssText: "box-shadow: 0 2px 10px rgba(0,0,0,0.4); border-radius: 4px;",
       textStyle: { color: INK, fontSize: 12, fontFamily: "Fragment Mono, monospace" },
     },
     grid: { left: 8, right: 16, top: 26, bottom: 8, containLabel: true },
@@ -143,7 +147,7 @@ function buildOption(event: ChartEvent): echarts.EChartsOption {
         {
           type: "pie",
           radius: ["40%", "68%"],
-          itemStyle: { borderColor: "#ffffff", borderWidth: 2 },
+          itemStyle: { borderColor: SURFACE, borderWidth: 2 },
           label: { color: INK, fontSize: 11, fontFamily: "Fragment Mono, monospace" },
           data: rows.map((r) => ({ name: String(r[x]), value: Number(r[y]) })),
         },

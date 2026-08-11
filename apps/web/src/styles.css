@@ -1,19 +1,23 @@
-/* Fino demo — "datasheet" theme.
-   Typeset like the technical documents EDA engineers actually read:
-   paper ground, ink text, vermilion accent, hairline rules, numbered
-   figures. Archivo for text, Fragment Mono for data. */
+/* Fino demo — dark "instrument" theme.
+   A conversational analytics UI on a warm near-black ground, the register
+   of an engineer's dark IDE / Claude Desktop: prose in Archivo, data and
+   labels in Fragment Mono, a single vermilion accent, hairline rules, and
+   numbered figures (FIG. NN) for charts. Token names keep the paper/ink
+   lineage from the light origin; only the values are dark. */
 
 :root {
-  --paper: #f7f6f2;
-  --paper-raise: #efede7;
-  --ink: #1b1b1f;
-  --ink-dim: #5c5c63;
-  --ink-faint: #97968f;
-  --rule: #d8d6cd;
-  --rule-dark: #1b1b1f;
-  --accent: #d23b1e; /* vermilion — instrumentation red */
-  --accent-soft: rgba(210, 59, 30, 0.08);
-  --cobalt: #2b50aa;
+  --paper: #17171b; /* ground — warm near-black */
+  --paper-raise: #1f1f25; /* raised surfaces: code blocks, cards */
+  --ink: #e9e7e1; /* primary text — warm off-white */
+  --ink-dim: #9d9c95; /* secondary */
+  --ink-faint: #66655f; /* labels, captions, metadata */
+  --rule: #2c2c33; /* hairlines */
+  --rule-dark: #3d3d45; /* stronger borders: card/figure edges */
+  --accent: #f0532f; /* vermilion — instrumentation red, lifted for dark */
+  --accent-soft: rgba(240, 83, 47, 0.13);
+  --cobalt: #6f9aff;
+  --green: #5bc98a; /* tool succeeded */
+  --red: #e06c6c; /* tool failed / error */
   --mono: "Fragment Mono", ui-monospace, monospace;
   --sans: "Archivo", -apple-system, sans-serif;
 }
@@ -41,27 +45,27 @@ body {
   padding: 0 28px;
 }
 
-/* ── masthead: double-rule datasheet header ─────────────── */
+/* ── masthead ───────────────────────────────────────────── */
 
 .header {
   display: flex;
   align-items: baseline;
-  gap: 18px;
-  padding: 26px 0 10px;
-  border-bottom: 3px double var(--rule-dark);
+  gap: 12px;
+  padding: 26px 0 12px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.mark {
+  color: var(--accent);
+  font-size: 24px;
+  line-height: 0;
+  align-self: center;
 }
 
 .wordmark {
   font-weight: 700;
   font-size: 26px;
   letter-spacing: 0.01em;
-}
-.wordmark::after {
-  content: "®";
-  font-size: 10px;
-  vertical-align: super;
-  color: var(--ink-faint);
-  font-weight: 400;
 }
 
 .header .sub {
@@ -97,64 +101,96 @@ body {
   scrollbar-color: var(--rule) transparent;
 }
 
+/* ── chat turn: user bubble, then assistant column ──────── */
+
 .turn {
-  display: grid;
-  grid-template-columns: 76px 1fr;
-  gap: 0 22px;
-  padding: 26px 0 30px;
+  padding: 22px 0 26px;
   border-bottom: 1px solid var(--rule);
   animation: settle 0.3s ease-out;
 }
+/* the last turn's separator would double up against the composer's top rule */
+.turn:last-child { border-bottom: none; }
 @keyframes settle { from { opacity: 0; transform: translateY(4px); } }
 
-.rail {
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--ink-faint);
-  text-align: right;
-  line-height: 1.9;
-  padding-top: 5px;
+.user-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 18px;
 }
-.rail .qno {
-  display: block;
-  color: var(--accent);
-  font-size: 13px;
-}
-.rail .time { display: block; }
-
-.content { min-width: 0; }
-
-.q {
-  font-size: 19px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  margin: 0 0 14px;
-  line-height: 1.35;
-}
-
-.progress {
-  color: var(--ink-dim);
-  margin: 12px 0;
-  max-width: 70ch;
+.user-bubble {
+  max-width: 80%;
+  background: var(--paper-raise);
+  border: 1px solid var(--rule-dark);
+  border-radius: 10px 10px 2px 10px;
+  padding: 9px 15px;
+  font-size: 15px;
+  line-height: 1.45;
   white-space: pre-wrap;
+}
+
+.assistant { min-width: 0; }
+
+/* ── activity: collapsible process log ──────────────────── */
+
+.activity {
+  margin: 0 0 16px;
+  border-left: 2px solid var(--rule);
+}
+.activity-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 1px 0 1px 12px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  text-align: left;
+}
+.activity-head:hover { color: var(--ink-dim); }
+.activity-head .caret { color: var(--ink-faint); flex: none; align-self: center; }
+.activity-head .working {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--accent);
+}
+.activity-head .working-spin { font-size: 12px; }
+.activity-head .worked { letter-spacing: 0.02em; }
+
+.spin { animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.activity-body { padding: 8px 0 4px 12px; }
+.narration {
+  color: var(--ink-dim);
+  font-size: 13.5px;
+  margin: 0 0 8px;
+  max-width: 72ch;
 }
 
 /* trace steps: the procedure log of what the agent is doing */
 .step {
   display: flex;
-  align-items: baseline;
-  gap: 9px;
-  margin: 3px 0;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
   font-family: var(--mono);
   font-size: 11.5px;
   color: var(--ink-dim);
   min-width: 0;
 }
-.step-mark { color: var(--accent); flex: none; }
-.step:not(.done) .step-mark { animation: blink 1s steps(1) infinite; }
-.step.done .step-mark { color: var(--ink-faint); animation: none; }
+.step-mark { flex: none; display: inline-flex; font-size: 12px; }
+.step.running .step-mark { color: var(--accent); }
+.step.done .step-mark { color: var(--green); }
+.step.failed .step-mark { color: var(--red); }
+.step-ico { flex: none; display: inline-flex; color: var(--ink-faint); font-size: 12px; }
 .step-tool { flex: none; color: var(--ink); font-size: 11.5px; }
-.step.done .step-tool { color: var(--ink-dim); }
+.step.done .step-tool,
+.step.failed .step-tool { color: var(--ink-dim); }
 .step-detail {
   color: var(--ink-faint);
   white-space: nowrap;
@@ -163,45 +199,134 @@ body {
   min-width: 0;
 }
 
+/* SQL as a visible code snippet: caption + fenced block */
 .sqlblock {
   margin: 14px 0;
-  border-left: 3px solid var(--rule);
 }
-.sqlblock summary {
-  cursor: pointer;
-  list-style: none;
-  padding: 2px 0 2px 12px;
+.sqlblock figcaption {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-family: var(--mono);
-  font-size: 10.5px;
-  letter-spacing: 0.14em;
+  font-size: 10px;
+  letter-spacing: 0.16em;
   color: var(--ink-faint);
   text-transform: uppercase;
-  user-select: none;
+  margin-bottom: 5px;
 }
-.sqlblock summary:hover { color: var(--accent); }
-.sqlblock summary::before { content: "+ "; }
-.sqlblock[open] summary::before { content: "− "; }
 .sqlblock pre {
-  margin: 6px 0 4px;
+  margin: 0;
   padding: 12px 14px;
   background: var(--paper-raise);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  overflow-x: auto;
+}
+.sqlblock code {
   font-family: var(--mono);
   font-size: 12px;
   line-height: 1.7;
   color: var(--ink);
-  white-space: pre-wrap;
-  word-break: break-word;
+  white-space: pre;
 }
 
-.summary {
+.answer {
+  position: relative;
   margin: 16px 0 0;
-  max-width: 70ch;
-  white-space: pre-wrap;
+  max-width: 72ch;
   font-size: 15px;
 }
-.summary strong, .progress strong {
+/* copy affordance: quiet until you hover the block it belongs to */
+.copy {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 2px 7px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+}
+.answer .copy {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+.answer:hover .copy,
+.sqlblock:hover .copy { opacity: 1; }
+.copy:hover { color: var(--accent); border-color: var(--accent); }
+
+/* Rendered markdown (agent replies). Blocks own their own spacing; the
+   surrounding .summary/.progress no longer pre-wraps. */
+.md > :first-child { margin-top: 0; }
+.md > :last-child { margin-bottom: 0; }
+.md p { margin: 0 0 12px; }
+.md strong { font-weight: 600; color: var(--accent); }
+.md h2,
+.md h3 {
+  font-family: var(--sans);
   font-weight: 600;
-  color: var(--accent);
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin: 20px 0 10px;
+  line-height: 1.3;
+}
+.md h2 { font-size: 18px; }
+.md h3 { font-size: 15px; }
+.md ul,
+.md ol { margin: 0 0 12px; padding-left: 22px; }
+.md li { margin: 3px 0; }
+.md li::marker { color: var(--ink-faint); }
+.md a { color: var(--cobalt); text-decoration: none; border-bottom: 1px solid var(--rule); }
+.md code {
+  font-family: var(--mono);
+  font-size: 0.88em;
+  background: var(--paper-raise);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+.md pre {
+  background: var(--paper-raise);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 12px 14px;
+  overflow-x: auto;
+}
+.md pre code { background: none; border: none; padding: 0; }
+.md table {
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 12px;
+  margin: 4px 0 14px;
+  display: block;
+  overflow-x: auto;
+}
+.md th {
+  text-align: left;
+  padding: 6px 12px 6px 0;
+  color: var(--ink-faint);
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  border-bottom: 1.5px solid var(--rule-dark);
+  white-space: nowrap;
+}
+.md td {
+  padding: 5px 12px 5px 0;
+  border-bottom: 1px solid var(--rule);
+  white-space: nowrap;
+}
+.md blockquote {
+  margin: 0 0 12px;
+  padding-left: 14px;
+  border-left: 3px solid var(--rule);
+  color: var(--ink-faint);
 }
 
 .error {
@@ -222,36 +347,15 @@ body {
   letter-spacing: 0.04em;
 }
 
-.thinking {
-  display: inline-block;
-  margin-top: 10px;
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--accent);
-}
-.thinking::before {
-  content: "▍";
-  animation: blink 1s steps(1) infinite;
-  margin-right: 8px;
-}
-@keyframes blink { 50% { opacity: 0; } }
-.thinking::after {
-  content: "";
-  display: inline-block;
-  width: 1.1em;
-  overflow: hidden;
-  vertical-align: bottom;
-  animation: dots 1.2s steps(4) infinite;
-}
-@keyframes dots { to { width: 0; } }
 
 /* ── figures ────────────────────────────────────────────── */
 
 .card {
   margin: 20px 0 8px;
   border: 1px solid var(--rule-dark);
-  background: #fff;
-  box-shadow: 4px 4px 0 var(--rule);
+  border-radius: 6px;
+  background: var(--paper-raise);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
 .card-head {
   display: flex;
@@ -293,7 +397,7 @@ body {
 }
 .card-foot .warn { color: var(--accent); }
 
-/* metric figure: one enormous datasheet numeral */
+/* metric figure: one enormous numeral */
 .metric {
   padding: 34px 16px 36px;
   text-align: center;
@@ -351,7 +455,7 @@ table.data tr:hover td { background: var(--accent-soft); }
 
 /* ── composer: heavy top rule, command line on paper ────── */
 
-.composer { padding: 14px 0 26px; border-top: 3px double var(--rule-dark); }
+.composer { padding: 14px 0 26px; border-top: 1px solid var(--rule); }
 
 .chips {
   display: flex;
@@ -378,28 +482,34 @@ table.data tr:hover td { background: var(--accent-soft); }
 .inputrow {
   display: flex;
   gap: 12px;
-  align-items: center;
-  background: #fff;
+  align-items: flex-end;
+  background: var(--paper-raise);
   border: 1.5px solid var(--rule-dark);
-  padding: 4px 4px 4px 16px;
+  border-radius: 8px;
+  padding: 6px 6px 6px 16px;
 }
-.inputrow:focus-within { box-shadow: 4px 4px 0 var(--rule); }
+.inputrow:focus-within { border-color: var(--accent); }
 .inputrow .prompt-mark {
   font-family: var(--mono);
   color: var(--accent);
   font-size: 13px;
+  padding-bottom: 11px;
 }
-.inputrow input {
+.inputrow textarea {
   flex: 1;
   background: none;
   border: none;
   outline: none;
+  resize: none;
   color: var(--ink);
   font-family: var(--sans);
   font-size: 15px;
+  line-height: 1.5;
   padding: 10px 0;
+  max-height: 168px;
+  overflow-y: auto;
 }
-.inputrow input::placeholder { color: var(--ink-faint); }
+.inputrow textarea::placeholder { color: var(--ink-faint); }
 .inputrow button {
   font-family: var(--mono);
   font-size: 12px;
@@ -407,9 +517,11 @@ table.data tr:hover td { background: var(--accent-soft); }
   background: var(--ink);
   color: var(--paper);
   border: none;
+  border-radius: 5px;
   padding: 11px 22px;
   cursor: pointer;
   transition: background 0.12s;
+  align-self: flex-end;
 }
 .inputrow button:hover:not(:disabled) { background: var(--accent); }
 .inputrow button:disabled { opacity: 0.3; cursor: default; }
