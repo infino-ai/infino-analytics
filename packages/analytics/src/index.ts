@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { runAgent, type AgentConfig } from "@infino-ai/analytics-agent";
-import type { ChatEvent } from "@infino-ai/analytics-viz-core";
+import type { ChatEvent } from "@infino-ai/analytics-core";
 
 export type {
   ChatEvent,
@@ -9,7 +9,7 @@ export type {
   ExecuteResult,
   Warning,
   ChartType,
-} from "@infino-ai/analytics-viz-core";
+} from "@infino-ai/analytics-core";
 
 export interface AnalyticsConfig {
   /** Infino target: hosted https://<host>/<database>. The apiKey falls back

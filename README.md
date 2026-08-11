@@ -59,16 +59,16 @@ for await (const event of analytics.ask("which features have the most denials?")
 ## Layout
 
 ```
-ingestion/           example data-loading scripts (run once, before chat)
-packages/viz-core    the contract layer: VizSpec, ChatEvent, execute() →
-                     { columns, rows, binding, warnings } — no LLM dependency
-packages/agent       the LLM harness (Claude Agent SDK) + tools + prompts;
-                     replaceable: anything yielding ChatEvents fits the seam
-packages/analytics   the facade: new Analytics({...}) — ask() (Fino), and the
-                     visualization/dashboard API (coming) on one client
-apps/server          the facade over HTTP: POST /api/chat (SSE) + demo UI host
-apps/web             demo chat UI (React + ECharts); <Chart> reads only binding
-examples/            runnable library-level integrations (single ask, sessions)
+ingestion/                example data-loading scripts (run once, before chat)
+packages/analytics-core   the contract layer: VizSpec, ChatEvent, execute() →
+                          { columns, rows, binding, warnings } — no LLM dependency
+packages/agent            the LLM harness (Claude Agent SDK) + tools + prompts;
+                          replaceable: anything yielding ChatEvents fits the seam
+packages/analytics        the facade: new Analytics({...}) — ask() (Fino), and the
+                          visualization/dashboard API (coming) on one client
+apps/server               the facade over HTTP: POST /api/chat (SSE) + demo UI host
+apps/web                  demo chat UI (React + ECharts); <Chart> reads only binding
+examples/                 runnable library-level integrations (single ask, sessions)
 ```
 
 The render contract in one line: the server resolves `metadata.binding`

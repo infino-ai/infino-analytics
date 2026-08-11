@@ -1,5 +1,5 @@
 {
-  "name": "@infino-ai/analytics-viz-core",
+  "name": "@infino-ai/analytics-core",
   "version": "0.0.0",
   "private": true,
   "type": "module",

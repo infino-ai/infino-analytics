@@ -1,11 +1,11 @@
 import { createRequire } from "node:module";
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import { InfinoClient, type InfinoConfig } from "@infino-ai/analytics-viz-core";
+import { InfinoClient, type InfinoConfig } from "@infino-ai/analytics-core";
 import { buildLocalTools } from "./tools.js";
 import { buildSystemPrompt } from "./prompt.js";
-import { type ChatEvent } from "@infino-ai/analytics-viz-core";
+import { type ChatEvent } from "@infino-ai/analytics-core";
 
-export type { ChatEvent } from "@infino-ai/analytics-viz-core";
+export type { ChatEvent } from "@infino-ai/analytics-core";
 
 // ── Tool policy ───────────────────────────────────────────────────────────
 // Split by what a tool can REACH, not by whether it's built-in.

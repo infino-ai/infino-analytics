@@ -8,6 +8,6 @@
   },
   "dependencies": {
     "@infino-ai/analytics-agent": "*",
-    "@infino-ai/analytics-viz-core": "*"
+    "@infino-ai/analytics-core": "*"
   }
 }

@@ -8,7 +8,7 @@ import {
   type ChatEvent,
   type ExecuteResult,
   type VizSpec,
-} from "@infino-ai/analytics-viz-core";
+} from "@infino-ai/analytics-core";
 
 
 // How much of a chart's data the MODEL sees. The full rows ride the event
