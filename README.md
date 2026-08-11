@@ -65,6 +65,8 @@ packages/analytics-core   the contract layer: VizSpec, ChatEvent, StorageAdapter
 packages/agent            the LLM harness (Claude Agent SDK) + tools + prompts;
                           replaceable: anything yielding ChatEvents fits the seam
 packages/storage-sqlite   the default StorageAdapter: threads in one SQLite file
+packages/storage-infino   alternative adapter: threads as tables in the Infino
+                          database itself (FINO_STORAGE=infino), no second store
 packages/analytics        the facade: new Analytics({...}) — ask() + threads (Fino),
                           and the visualization/dashboard API (coming) on one client
 apps/server               the facade over HTTP: POST /api/chat (SSE) + demo UI host

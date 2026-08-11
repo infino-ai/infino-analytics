@@ -21,6 +21,7 @@ import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { Analytics } from "@infino-ai/analytics";
 import { SqliteStorage } from "@infino-ai/analytics-storage-sqlite";
+import { InfinoStorage } from "@infino-ai/analytics-storage-infino";
 
 const PORT = Number(process.env.PORT ?? 8787);
 
@@ -33,9 +34,14 @@ function requireEnv(name: string): string {
   return v;
 }
 
-// The storage seam, wired: one line decides where threads live. Swap in any
-// other StorageAdapter (your own database) without touching anything below.
-const storage = new SqliteStorage({ path: process.env.FINO_DB ?? "./data/analytics.db" });
+// The storage seam, wired: these lines decide where threads live. Swap in
+// any other StorageAdapter (your own database) without touching anything
+// below. FINO_STORAGE=infino keeps threads in the Infino database itself
+// (no second datastore); the default is a local SQLite file.
+const storage =
+  process.env.FINO_STORAGE === "infino"
+    ? new InfinoStorage({ uri: requireEnv("INFINO_URI") })
+    : new SqliteStorage({ path: process.env.FINO_DB ?? "./data/analytics.db" });
 
 const analytics = new Analytics({
   infino: { uri: requireEnv("INFINO_URI") },
