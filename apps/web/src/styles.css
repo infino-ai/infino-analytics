@@ -36,13 +36,12 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* App shell: full-bleed. The sidebar hugs the left edge; the conversation
+   fills the rest, with only the reading column constrained (below). */
 .app {
   height: 100%;
   display: flex;
   flex-direction: column;
-  max-width: 1240px;
-  margin: 0 auto;
-  padding: 0 28px;
 }
 
 /* body row: thread sidebar + the conversation column */
@@ -50,7 +49,6 @@ body {
   flex: 1;
   display: flex;
   min-height: 0; /* let children scroll instead of the page */
-  gap: 28px;
 }
 
 .main {
@@ -58,18 +56,30 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  max-width: 960px;
+  padding: 0 36px;
+}
+
+/* The readable measure: every block in the conversation column centers
+   itself at this width inside the full-bleed main area. */
+.turn,
+.empty,
+.composer {
+  width: 100%;
+  max-width: 880px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* ── sidebar: the thread rail ───────────────────────────── */
 
 .sidebar {
-  width: 224px;
+  width: 248px;
   flex: none;
   display: flex;
   flex-direction: column;
-  padding: 14px 0;
+  padding: 14px 10px 14px 20px;
   border-right: 1px solid var(--rule);
+  background: rgba(255, 255, 255, 0.012);
 }
 
 .newthread {
@@ -82,7 +92,7 @@ body {
   border: 1px solid var(--rule-dark);
   border-radius: 4px;
   padding: 7px 10px;
-  margin-right: 14px;
+  margin-right: 10px;
   cursor: pointer;
 }
 .newthread:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
@@ -98,7 +108,7 @@ body {
 .threaditem {
   display: flex;
   align-items: center;
-  margin-right: 14px;
+  margin-right: 10px;
   border-radius: 4px;
 }
 .threaditem:hover { background: var(--paper-raise); }
@@ -148,7 +158,7 @@ body {
   display: flex;
   align-items: baseline;
   gap: 12px;
-  padding: 26px 0 12px;
+  padding: 20px 36px 12px 20px;
   border-bottom: 1px solid var(--rule);
 }
 
