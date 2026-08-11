@@ -44,22 +44,30 @@ new Analytics(config: AnalyticsConfig)
 | `llm.model` | `string?` | `claude-opus-5` | Anthropic model id used by the default harness |
 | `llm.anthropicApiKey` | `string?` | `ANTHROPIC_API_KEY` | LLM credential |
 | `llm.maxBudgetUsd` | `number?` | `2` | Hard spend ceiling per question; the run stops with an `error` event if it would exceed this |
+| `storage` | `StorageAdapter?` | `InMemoryStorage` | Where threads live. Pass `SqliteStorage` (from `@infino-ai/analytics-storage-sqlite`) or your own adapter; see Threads and persistence below |
 
 `llm` as a whole is optional: leave it out entirely if a deployment only uses
 the non-conversational surfaces.
 
 ## Methods
 
-### `createSession(): string`
+### `threads` (property): the conversation store
 
-Creates a conversation and returns its id. Pass the id to `ask()` so
-follow-up questions keep context ("break that down by month" works because
-the previous question and its results are remembered).
+Thread CRUD and transcripts, backed by whatever `storage` you configured:
 
-Sessions are held in memory today: they do not survive a process restart,
-and there is no cross-instance sharing. Thread persistence through a
-`StorageAdapter` (with a SQLite default) is the next planned change; the
-method shape will not change.
+| Method | Meaning |
+|---|---|
+| `threads.create({id?, title?})` | New thread. The title auto-sets from the first question if left empty |
+| `threads.get(id)` | The thread, or `null` |
+| `threads.list({limit?, before?})` | Newest activity first; `before` pages by `updatedAt` |
+| `threads.rename(id, title)` | Set the title |
+| `threads.delete(id)` | Remove the thread and its messages |
+| `threads.appendMessage(threadId, msg)` | Append a turn; message ids may be client-supplied (duplicate ids are rejected, making retries idempotent) |
+| `threads.listMessages(threadId, {limit?, before?})` | The transcript, oldest first; `before` pages backwards from a message id |
+
+### `createSession(): Promise<string>`
+
+Sugar over `threads.create()`: creates a thread and returns its id.
 
 ### `ask(question, opts?): AsyncGenerator<ChatEvent>`
 
@@ -67,18 +75,18 @@ Runs one question through the agent and yields typed events as work happens.
 
 | Option | Type | Meaning |
 |---|---|---|
-| `opts.sessionId` | `string?` | Continue the conversation created by `createSession()`. Unknown ids throw. Omit for a one-shot question |
+| `opts.threadId` | `string?` | Persist this turn to the thread and continue its conversation ("break that down by month" works because the previous question and results are remembered). Unknown ids throw. Omit for a one-shot question that leaves no trace |
 | `opts.signal` | `AbortSignal?` | Cancels the run itself (the model stops, tools stop), not just the event stream. Wire client disconnects to this |
 
 The generator ends after a final `done` event, which always arrives: on
 success, on error, and on abort.
 
 ```ts
-const sessionId = analytics.createSession();
+const threadId = await analytics.createSession();
 const abort = new AbortController();
 
 for await (const event of analytics.ask("top 10 users by denials", {
-  sessionId,
+  threadId,
   signal: abort.signal,
 })) {
   switch (event.type) {
@@ -89,6 +97,40 @@ for await (const event of analytics.ask("top 10 users by denials", {
   }
 }
 ```
+
+## Threads and persistence
+
+With a `threadId`, `ask()` persists the turn through the storage adapter:
+the user's question, then one assistant message holding the full event list
+that was shown (charts included, with their result rows). History re-renders
+from the transcript without re-querying, so numbers don't drift and old
+threads outlive schema changes. Transient events (`status`, `delta`) are
+never persisted; a turn ended early by abort or error persists whatever had
+arrived, which is exactly what the user saw.
+
+The adapter also keeps the agent harness's session pointer per thread, so a
+reopened thread resumes with the model's conversational context. That
+context lives with the harness on the server host, not in the adapter: if
+it's gone (new machine), the thread still renders fully from the transcript
+and the conversation simply continues with fresh context.
+
+Storage is a seam: consumers type against the `StorageAdapter` interface
+only, so swapping databases is constructing a different adapter.
+
+```ts
+import { SqliteStorage } from "@infino-ai/analytics-storage-sqlite";
+
+const analytics = new Analytics({
+  infino: { uri, apiKey },
+  storage: new SqliteStorage({ path: "./data/analytics.db" }),
+});
+```
+
+Bundled adapters: `InMemoryStorage` (the default: zero setup, nothing
+survives a restart) and `SqliteStorage` (one file, WAL mode, no
+infrastructure; right for development and single-node production). For
+another database, implement the `ThreadStore` methods above over it; the
+interface is async throughout, so network-backed stores fit naturally.
 
 ## Event reference
 
@@ -149,5 +191,5 @@ of a conforming ECharts renderer.
 `visualizations` and `dashboards` namespaces: persistence (create, get,
 list, update, delete) and execution for the same `VizSpec` objects the agent
 emits, with dashboard-level filter and time-range injection. Pure data
-plane, no LLM in the path. The event and chart contracts above will not
-change shape.
+plane, no LLM in the path. They arrive on the same `StorageAdapter` object
+threads use. The event and chart contracts above will not change shape.

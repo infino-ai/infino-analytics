@@ -60,12 +60,13 @@ for await (const event of analytics.ask("which features have the most denials?")
 
 ```
 ingestion/                example data-loading scripts (run once, before chat)
-packages/analytics-core   the contract layer: VizSpec, ChatEvent, execute() →
-                          { columns, rows, binding, warnings } — no LLM dependency
+packages/analytics-core   the contract layer: VizSpec, ChatEvent, StorageAdapter,
+                          execute() → { columns, rows, binding, warnings } — no LLM
 packages/agent            the LLM harness (Claude Agent SDK) + tools + prompts;
                           replaceable: anything yielding ChatEvents fits the seam
-packages/analytics        the facade: new Analytics({...}) — ask() (Fino), and the
-                          visualization/dashboard API (coming) on one client
+packages/storage-sqlite   the default StorageAdapter: threads in one SQLite file
+packages/analytics        the facade: new Analytics({...}) — ask() + threads (Fino),
+                          and the visualization/dashboard API (coming) on one client
 apps/server               the facade over HTTP: POST /api/chat (SSE) + demo UI host
 apps/web                  demo chat UI (React + ECharts); <Chart> reads only binding
 examples/                 runnable library-level integrations (single ask, sessions)
@@ -78,5 +79,6 @@ own frontend does the same against `/api/chat`.
 ## Status
 
 Working: conversational analytics end to end (ask → SQL → chart) with
-multi-turn sessions. Coming next: thread persistence via the
-StorageAdapter, and the visualization/dashboard persistence API.
+persistent threads: transcripts (charts included) survive restarts in
+SQLite, and reopened threads resume the model's context. Coming next:
+the visualization/dashboard persistence API on the same StorageAdapter.

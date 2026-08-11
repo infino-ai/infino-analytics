@@ -2,10 +2,13 @@
 //
 //   INFINO_URI=https://<host>/<database> INFINO_API_KEY=... npm run dev -w @infino-ai/analytics-server
 //
-// Surface (day one):
-//   POST /api/sessions        → { sessionId }
-//   POST /api/chat            → SSE stream of ChatEvents ({ sessionId, question })
-//   GET  /*                   → the demo web UI (when built)
+// Surface:
+//   POST   /api/threads               → { thread } (also aliased as POST /api/sessions)
+//   GET    /api/threads               → { threads } newest-activity first
+//   GET    /api/threads/:id/messages  → { messages } the persisted transcript
+//   DELETE /api/threads/:id           → 204
+//   POST   /api/chat                  → SSE stream of ChatEvents ({ threadId, question })
+//   GET    /*                         → the demo web UI (when built)
 //
 // The viz/dashboard persistence routes (parity API) land in the next phase.
 // One process on purpose: it splits into a standalone deployable when that
@@ -17,6 +20,7 @@ import { fileURLToPath } from "node:url";
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { Analytics } from "@infino-ai/analytics";
+import { SqliteStorage } from "@infino-ai/analytics-storage-sqlite";
 
 const PORT = Number(process.env.PORT ?? 8787);
 
@@ -29,14 +33,47 @@ function requireEnv(name: string): string {
   return v;
 }
 
+// The storage seam, wired: one line decides where threads live. Swap in any
+// other StorageAdapter (your own database) without touching anything below.
+const storage = new SqliteStorage({ path: process.env.FINO_DB ?? "./data/analytics.db" });
+
 const analytics = new Analytics({
   infino: { uri: requireEnv("INFINO_URI") },
   llm: { model: process.env.FINO_MODEL },
+  storage,
 });
 
 const app = new Hono();
 
-app.post("/api/sessions", (c) => c.json({ sessionId: analytics.createSession() }));
+app.post("/api/threads", async (c) => c.json({ thread: await analytics.threads.create() }));
+// Alias kept for the original session-flavored surface.
+app.post("/api/sessions", async (c) =>
+  c.json({ sessionId: (await analytics.threads.create()).id }),
+);
+
+app.get("/api/threads", async (c) => {
+  const limit = Number(c.req.query("limit") ?? 50);
+  const before = c.req.query("before");
+  return c.json({
+    threads: await analytics.threads.list({ limit, before: before ? Number(before) : undefined }),
+  });
+});
+
+app.get("/api/threads/:id/messages", async (c) => {
+  const thread = await analytics.threads.get(c.req.param("id"));
+  if (!thread) return c.json({ error: "unknown thread" }, 404);
+  const limit = Number(c.req.query("limit") ?? 100);
+  const before = c.req.query("before");
+  return c.json({
+    thread,
+    messages: await analytics.threads.listMessages(thread.id, { limit, before }),
+  });
+});
+
+app.delete("/api/threads/:id", async (c) => {
+  await analytics.threads.delete(c.req.param("id"));
+  return c.body(null, 204);
+});
 
 // Suggestion chips for the demo UI. Deployment-specific: set FINO_SUGGESTIONS
 // to pipe-separated questions that fit the loaded data; the defaults work on
@@ -54,9 +91,11 @@ app.get("/api/suggestions", (c) => {
 });
 
 app.post("/api/chat", async (c) => {
-  const body = await c.req.json<{ question?: string; sessionId?: string }>();
+  const body = await c.req.json<{ question?: string; threadId?: string; sessionId?: string }>();
   const question = body.question?.trim();
   if (!question) return c.json({ error: "question is required" }, 400);
+  // sessionId accepted as the legacy spelling of threadId.
+  const threadId = body.threadId ?? body.sessionId;
 
   const abort = new AbortController();
   // Client disconnect (tab closed, stop button) cancels the run.
@@ -72,7 +111,7 @@ app.post("/api/chat", async (c) => {
         // The signal reaches the agent harness: a client disconnect stops
         // the model run itself, not just this stream.
         for await (const event of analytics.ask(question, {
-          sessionId: body.sessionId,
+          threadId,
           signal: abort.signal,
         })) {
           if (abort.signal.aborted) break;

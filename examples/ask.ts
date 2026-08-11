@@ -17,11 +17,11 @@ const analytics = new Analytics({
   },
 });
 
-const sessionId = analytics.createSession();
-console.log(`# session ${sessionId}`);
+const threadId = await analytics.createSession();
+console.log(`# thread ${threadId}`);
 console.log(`# Q: ${question}\n`);
 
-for await (const event of analytics.ask(question, { sessionId })) {
+for await (const event of analytics.ask(question, { threadId })) {
   switch (event.type) {
     case "progress":
       console.log(`[progress] ${event.text}\n`);

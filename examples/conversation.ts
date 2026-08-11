@@ -37,13 +37,13 @@ function print(event: ChatEvent) {
   }
 }
 
-const sessionId = analytics.createSession();
+const threadId = await analytics.createSession();
 
 console.log("### Q1: trend\n");
-for await (const e of analytics.ask("Show me a trend over time in this data", { sessionId })) print(e);
+for await (const e of analytics.ask("Show me a trend over time in this data", { threadId })) print(e);
 
 console.log("### Q2 (follow-up): drill in\n");
 for await (const e of analytics.ask(
   "Break down the most interesting point from that chart",
-  { sessionId },
+  { threadId },
 )) print(e);
