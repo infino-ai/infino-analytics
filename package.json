@@ -20,8 +20,5 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p apps/web/tsconfig.json",
     "build": "npm run build -w @infino-ai/analytics-web",
     "dev": "npm run build -w @infino-ai/analytics-web && npm run dev -w @infino-ai/analytics-server"
-  },
-  "overrides": {
-    "@infino-ai/infino": "^0.5.0"
   }
 }

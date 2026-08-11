@@ -7,6 +7,46 @@ import { type ChatEvent } from "@infino-ai/analytics-viz-core";
 
 export type { ChatEvent } from "@infino-ai/analytics-viz-core";
 
+// ── Tool policy ───────────────────────────────────────────────────────────
+// Split by what a tool can REACH, not by whether it's built-in.
+//
+// AUTO-APPROVED ("dontAsk" runs these without a prompt):
+//   - the Infino engine over MCP + our create_chart tool — the core surface;
+//   - WebSearch / WebFetch — analytical enrichment (industry benchmarks,
+//     current prices, definitions). The model decides when a question needs
+//     outside context. These reach the public internet, not this server's
+//     host, so they carry none of the credential risk the host tools do.
+//     (WebFetch retrieves model-chosen URLs — an SSRF surface; a hardened
+//     deployment behind internal services may drop it.)
+const ALLOWED_TOOLS = ["mcp__infino-engine__*", "mcp__fino__*", "WebSearch", "WebFetch"];
+
+// DENIED regardless of the above. Under "dontAsk", allowedTools only
+// AUTO-APPROVES its entries — it does NOT gate the SDK's other built-ins
+// (verified: Bash ran while unlisted). These execute on the machine running
+// this server, whose environment holds the Infino and Anthropic API keys, so
+// a prompt-injected command could exfiltrate them. Keep them denied.
+//
+// Want the agent to run code (Python/pandas) for heavier analysis? In the
+// Agent SDK that is Bash-on-host — there is no sandbox here, so it is the
+// SAME switch as "let the agent read our API keys." Enable it ONLY in an
+// isolated deployment (a container with the keys kept out of the
+// child-process environment and egress restricted) by removing "Bash" below.
+// Never on a host that can see your secrets.
+const DENIED_TOOLS = [
+  "Bash",
+  "BashOutput",
+  "KillShell",
+  "Read",
+  "Write",
+  "Edit",
+  "MultiEdit",
+  "NotebookEdit",
+  "Glob",
+  "Grep",
+  "Task",
+  "Agent",
+];
+
 // Ceiling on tool-use round trips per question; a runaway loop stops here.
 const DEFAULT_MAX_TURNS = 25;
 const DEFAULT_MODEL = "claude-opus-5";
@@ -76,7 +116,8 @@ export async function* runAgent(params: {
       // repo settings from wherever the server happens to run.
       settingSources: [],
       permissionMode: "dontAsk",
-      allowedTools: ["mcp__infino-engine__*", "mcp__fino__*"],
+      allowedTools: ALLOWED_TOOLS,
+      disallowedTools: DENIED_TOOLS,
       // Use exactly the servers configured here — user/project MCP settings
       // on the host machine must not leak into (or disable parts of) the
       // agent's tool surface.
