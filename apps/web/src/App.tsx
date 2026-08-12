@@ -51,6 +51,45 @@ function SqlReveal({ sql }: { sql: string }) {
   );
 }
 
+// Step events gain client-side completion state when step_done arrives.
+type TurnEvent = ChatEvent & { done?: boolean; ok?: boolean };
+type StepEvent = Extract<TurnEvent, { type: "step" }>;
+
+// A tool call, inline in the narrative where it happened: a quiet chip with
+// the tool name, expandable to read the input it ran with.
+function StepChip({ step }: { step: StepEvent }) {
+  const [open, setOpen] = useState(false);
+  const expandable = Boolean(step.detail);
+  const state = !step.done ? "running" : step.ok ? "done" : "failed";
+  return (
+    <div className={`stepchip ${state}${open ? " open" : ""}`}>
+      <button
+        className="stepchip-head"
+        onClick={() => expandable && setOpen(!open)}
+        disabled={!expandable}
+      >
+        <span className="step-mark">
+          {!step.done ? <Spinner /> : step.ok ? <Check /> : <Cross />}
+        </span>
+        <span className="step-ico">
+          <ToolIcon tool={step.tool} />
+        </span>
+        <code className="step-tool">{step.tool}</code>
+        {expandable && <Chevron className="caret" open={open} />}
+      </button>
+      {expandable && (
+        <div className="stepchip-wrap">
+          <div className="stepchip-inner">
+            <pre>
+              <code>{step.detail}</code>
+            </pre>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CopyButton({ text }: { text: string }) {
   const [done, setDone] = useState(false);
   return (
@@ -67,22 +106,17 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-// Step events gain client-side completion state when step_done arrives.
-type TurnEvent = ChatEvent & { done?: boolean; ok?: boolean };
-
 interface Turn {
   id: number;
   question: string;
   startedAt: number;
   elapsed?: number;
   events: TurnEvent[];
-  /** Accumulated streaming text for the forming answer. */
+  /** Accumulated streaming text for the forming block. */
   live: string;
-  /** Current activity label ("running a query…"). */
+  /** Current activity label ("thinking") for the working line. */
   status: string;
   running: boolean;
-  /** Whether the process/activity block is expanded. Auto-collapses on done. */
-  activityOpen: boolean;
 }
 
 let turnCounter = 0;
@@ -103,7 +137,6 @@ function turnsFromMessages(messages: StoredMessage[]): Turn[] {
         live: "",
         status: "",
         running: false,
-        activityOpen: false,
       });
     } else {
       const turn = turns[turns.length - 1];
@@ -122,6 +155,85 @@ function turnsFromMessages(messages: StoredMessage[]): Turn[] {
     }
   }
   return turns;
+}
+
+// The turn body, Claude-Desktop style: one chronological flow. Narration is
+// first-class prose, each tool call sits inline where it happened as an
+// expandable chip, charts render where they arrived (their SQL one click
+// deep), and the last text block is simply the end of the narrative —
+// nothing relocates when the turn finishes.
+function TurnBody({ turn }: { turn: Turn }) {
+  // Index of the final text block (for the copy affordance).
+  let lastTextIdx = -1;
+  if (!turn.running) {
+    for (let k = turn.events.length - 1; k >= 0; k--) {
+      const t = turn.events[k].type;
+      if (t === "summary" || t === "progress") {
+        lastTextIdx = k;
+        break;
+      }
+    }
+  }
+
+  const blocks: React.ReactNode[] = [];
+  let pendingSql: string | undefined;
+  turn.events.forEach((e, k) => {
+    switch (e.type) {
+      case "progress":
+      case "summary":
+        blocks.push(
+          <div className="prose" key={k}>
+            <Md text={e.text} />
+            {k === lastTextIdx && <CopyButton text={e.text} />}
+          </div>,
+        );
+        break;
+      case "step":
+        blocks.push(<StepChip step={e} key={`s${e.id}`} />);
+        break;
+      case "sql":
+        pendingSql = e.query; // attaches to the chart that follows
+        break;
+      case "chart":
+        blocks.push(
+          <div key={k}>
+            <ChartCard event={e} />
+            {pendingSql && <SqlReveal sql={pendingSql} />}
+          </div>,
+        );
+        pendingSql = undefined;
+        break;
+      case "error":
+        blocks.push(
+          <div className="error" key={k}>
+            {e.message}
+          </div>,
+        );
+        break;
+      default:
+        break;
+    }
+  });
+
+  return (
+    <div className="assistant">
+      {blocks}
+      {turn.running && turn.live && (
+        <div className="prose">
+          <Md text={turn.live} />
+        </div>
+      )}
+      {turn.running && (
+        <div className="working-line">
+          <Spinner className="working-spin" />
+          {turn.status || "working"}
+        </div>
+      )}
+      {!turn.running && turn.elapsed !== undefined && (
+        <div className="turn-time">{turn.elapsed.toFixed(1)}s</div>
+      )}
+    </div>
+  );
 }
 
 export default function App() {
@@ -161,10 +273,6 @@ export default function App() {
     const el = threadRef.current;
     if (!el) return;
     stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-  }
-
-  function toggleActivity(id: number) {
-    setTurns((t) => t.map((x) => (x.id === id ? { ...x, activityOpen: !x.activityOpen } : x)));
   }
 
   function stop() {
@@ -222,7 +330,6 @@ export default function App() {
         live: "",
         status: "analyzing",
         running: true,
-        activityOpen: true,
       },
     ]);
     try {
@@ -245,12 +352,16 @@ export default function App() {
               e.type === "step" && e.id === event.id ? { ...e, done: true, ok: event.ok } : e,
             );
           } else {
+            // The complete text block supersedes its streamed deltas; a new
+            // step means the model has moved on from writing.
             if (event.type === "progress" || event.type === "summary") turn.live = "";
-            if (event.type === "step") turn.status = "";
+            if (event.type === "step") {
+              turn.live = "";
+              turn.status = "";
+            }
             turn.events = [...turn.events, event];
             if (event.type === "done") {
               turn.running = false;
-              turn.activityOpen = false; // tidy up once the answer has landed
               turn.elapsed = (Date.now() - turn.startedAt) / 1000;
             }
           }
@@ -265,15 +376,13 @@ export default function App() {
       setBusy(false);
       setTurns((t) => {
         const copy = t.slice();
-        const last = { ...copy[copy.length - 1], live: "", running: false, activityOpen: false };
+        const last = { ...copy[copy.length - 1], live: "", running: false };
         copy[copy.length - 1] = last;
         return copy;
       });
       refreshThreads(); // pick up the auto-set title and new ordering
     }
   }
-
-  let figNo = 0;
 
   return (
     <div className="app">
@@ -327,150 +436,14 @@ export default function App() {
               </div>
             )}
 
-            {turns.map((turn) => {
-              // Partition the event stream into process (tucked into the
-              // activity block), figures (always visible), and the answer.
-              const steps = turn.events.filter((e) => e.type === "step") as Extract<
-                TurnEvent,
-                { type: "step" }
-              >[];
-              const summary = [...turn.events].reverse().find((e) => e.type === "summary") as
-                | Extract<TurnEvent, { type: "summary" }>
-                | undefined;
-              const errors = turn.events.filter((e) => e.type === "error") as Extract<
-                TurnEvent,
-                { type: "error" }
-              >[];
-
-              // The headline answer only exists once the turn is done: it's
-              // the summary, or (absent one) the LAST assistant text block.
-              // Its event index is excluded from the activity log so it
-              // isn't shown twice. While the turn is running, nothing is the
-              // "answer" yet — every narration line is the model thinking
-              // out loud, and belongs in the working log.
-              let answerIdx = -1;
-              if (!turn.running) {
-                if (summary) {
-                  answerIdx = turn.events.lastIndexOf(summary);
-                } else {
-                  for (let k = turn.events.length - 1; k >= 0; k--) {
-                    if (turn.events[k].type === "progress") {
-                      answerIdx = k;
-                      break;
-                    }
-                  }
-                }
-              }
-              const answerText =
-                answerIdx >= 0 ? (turn.events[answerIdx] as { text: string }).text : "";
-
-              // Pair each chart with the SQL emitted just before it.
-              const figures: { sql?: string; chart: Extract<TurnEvent, { type: "chart" }> }[] = [];
-              let pendingSql: string | undefined;
-              for (const e of turn.events) {
-                if (e.type === "sql") pendingSql = e.query;
-                else if (e.type === "chart") {
-                  figures.push({ sql: pendingSql, chart: e });
-                  pendingSql = undefined;
-                }
-              }
-
-              // The working log = narration + tool steps, in the order they
-              // happened, minus whichever text block became the answer.
-              const logItems = turn.events
-                .map((e, k) => ({ e, k }))
-                .filter(
-                  ({ e, k }) => (e.type === "progress" && k !== answerIdx) || e.type === "step",
-                );
-
-              const open = turn.running || turn.activityOpen;
-              const hasActivity = logItems.length > 0 || turn.running;
-
-              return (
-                <div className="turn" key={turn.id}>
-                  <div className="user-row">
-                    <div className="user-bubble">{turn.question}</div>
-                  </div>
-
-                  <div className="assistant">
-                    {hasActivity && (
-                      <div className={open ? "activity open" : "activity"}>
-                        <button className="activity-head" onClick={() => toggleActivity(turn.id)}>
-                          <Chevron className="caret" open={open} />
-                          {turn.running ? (
-                            <span className="working">
-                              <Spinner className="working-spin" />
-                              {turn.status || "working"}
-                            </span>
-                          ) : (
-                            <span className="worked">{steps.length} steps</span>
-                          )}
-                        </button>
-                        <div className="activity-wrap">
-                          <div className="activity-body">
-                            {logItems.map(({ e, k }) =>
-                              e.type === "step" ? (
-                                <div
-                                  className={
-                                    "step " + (!e.done ? "running" : e.ok ? "done" : "failed")
-                                  }
-                                  key={`s${e.id}`}
-                                >
-                                  <span className="step-mark">
-                                    {!e.done ? <Spinner /> : e.ok ? <Check /> : <Cross />}
-                                  </span>
-                                  <span className="step-ico">
-                                    <ToolIcon tool={e.tool} />
-                                  </span>
-                                  <code className="step-tool">{e.tool}</code>
-                                  {e.detail && <span className="step-detail">{e.detail}</span>}
-                                </div>
-                              ) : (
-                                <div className="narration" key={`n${k}`}>
-                                  <Md text={(e as { text: string }).text} />
-                                </div>
-                              ),
-                            )}
-                            {turn.running && turn.live && (
-                              <div className="narration">
-                                <Md text={turn.live} />
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {figures.map(({ sql, chart }) => {
-                      figNo += 1;
-                      return (
-                        <div key={`fig${figNo}`}>
-                          <ChartCard event={chart} />
-                          {sql && <SqlReveal sql={sql} />}
-                        </div>
-                      );
-                    })}
-
-                    {errors.map((e, k) => (
-                      <div className="error" key={`e${k}`}>
-                        {e.message}
-                      </div>
-                    ))}
-
-                    {answerText && (
-                      <div className="answer">
-                        <Md text={answerText} />
-                        <CopyButton text={answerText} />
-                      </div>
-                    )}
-
-                    {!turn.running && turn.elapsed !== undefined && (
-                      <div className="turn-time">{turn.elapsed.toFixed(1)}s</div>
-                    )}
-                  </div>
+            {turns.map((turn) => (
+              <div className="turn" key={turn.id}>
+                <div className="user-row">
+                  <div className="user-bubble">{turn.question}</div>
                 </div>
-              );
-            })}
+                <TurnBody turn={turn} />
+              </div>
+            ))}
           </div>
 
           <div className="composer">

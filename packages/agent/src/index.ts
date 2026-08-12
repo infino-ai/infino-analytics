@@ -239,9 +239,11 @@ function* drain(queue: ChatEvent[]): Generator<ChatEvent> {
   while (queue.length > 0) yield queue.shift() as ChatEvent;
 }
 
-// One-line input summary for a trace step: prefer the payload the user would
-// recognize (the SQL text, the table, the chart title) over raw JSON.
-const STEP_DETAIL_MAX = 160;
+// Input summary for a trace step: prefer the payload the user would
+// recognize (the SQL text, the table, the chart title) over raw JSON. Sent
+// near-full so a UI can offer expand-to-read; display truncation is the
+// renderer's job.
+const STEP_DETAIL_MAX = 2000;
 function stepDetail(input: Record<string, unknown> | undefined): string | undefined {
   if (!input) return undefined;
   const pick = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);

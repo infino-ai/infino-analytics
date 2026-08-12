@@ -246,88 +246,81 @@ body {
 
 .assistant { min-width: 0; }
 
-/* ── activity: collapsible process log ──────────────────── */
+/* ── the narrative flow ─────────────────────────────────── */
+/* The assistant's turn is one chronological column: prose, inline tool
+   chips where calls happened, figures where they arrived. Nothing moves
+   when the turn completes. */
 
-.activity {
-  margin: 0 0 16px;
-  border-left: 2px solid var(--rule);
+.prose {
+  margin: 14px 0;
+  font-size: 15px;
+  animation: settle 0.3s ease-out;
 }
-.activity-head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  width: 100%;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 1px 0 1px 12px;
-  font-family: var(--mono);
-  font-size: 11.5px;
-  color: var(--ink-faint);
-  text-align: left;
-}
-.activity-head:hover { color: var(--ink-dim); }
-.activity-head .caret { color: var(--ink-faint); flex: none; align-self: center; }
-.activity-head .working {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--accent);
-}
-.activity-head .working-spin { font-size: 12px; }
-.activity-head .worked { letter-spacing: 0.02em; }
 
 .spin { animation: spin 0.7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* Expand/collapse animates: the wrap's grid row eases between 0fr and 1fr
-   (height-auto animation without measuring), padding eases in with it. */
-.activity-wrap {
+/* a tool call, inline where it happened: quiet chip, expandable input */
+.stepchip {
+  margin: 10px 0;
+  animation: settle 0.3s ease-out;
+}
+.stepchip-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+.stepchip-head:disabled { cursor: default; }
+.stepchip-head:not(:disabled):hover .step-tool { color: var(--ink); }
+.step-mark { flex: none; display: inline-flex; font-size: 12px; }
+.stepchip.running .step-mark { color: var(--accent); }
+.stepchip.done .step-mark { color: var(--green); }
+.stepchip.failed .step-mark { color: var(--red); }
+.step-ico { flex: none; display: inline-flex; color: var(--ink-faint); font-size: 12px; }
+.step-tool { color: var(--ink-dim); font-size: 11.5px; }
+.stepchip-head .caret { font-size: 11px; color: var(--ink-faint); }
+.stepchip-wrap {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows 0.28s ease;
+  transition: grid-template-rows 0.25s ease;
 }
-.activity.open .activity-wrap { grid-template-rows: 1fr; }
-.activity-body {
-  overflow: hidden;
-  min-height: 0;
-  padding: 0 0 0 12px;
-  transition: padding 0.28s ease;
+.stepchip.open .stepchip-wrap { grid-template-rows: 1fr; }
+.stepchip-inner { overflow: hidden; min-height: 0; }
+.stepchip-inner pre {
+  margin: 5px 0 0;
+  padding: 10px 13px;
+  background: var(--paper-raise);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  overflow-x: auto;
 }
-.activity.open .activity-body { padding: 8px 0 4px 12px; }
-.narration {
+.stepchip-inner code {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.7;
   color: var(--ink-dim);
-  font-size: 13.5px;
-  margin: 0 0 8px;
-  max-width: 72ch;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
-/* trace steps: the procedure log of what the agent is doing */
-.step {
+/* the live indicator at the foot of a running turn */
+.working-line {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 4px 0;
+  margin: 14px 0 4px;
   font-family: var(--mono);
   font-size: 11.5px;
-  color: var(--ink-dim);
-  min-width: 0;
+  color: var(--accent);
 }
-.step-mark { flex: none; display: inline-flex; font-size: 12px; }
-.step.running .step-mark { color: var(--accent); }
-.step.done .step-mark { color: var(--green); }
-.step.failed .step-mark { color: var(--red); }
-.step-ico { flex: none; display: inline-flex; color: var(--ink-faint); font-size: 12px; }
-.step-tool { flex: none; color: var(--ink); font-size: 11.5px; }
-.step.done .step-tool,
-.step.failed .step-tool { color: var(--ink-dim); }
-.step-detail {
-  color: var(--ink-faint);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
+.working-line .working-spin { font-size: 13px; }
 
 /* The SQL behind a figure: collapsed disclosure under the chart card;
    expanding eases open the fenced snippet. */
