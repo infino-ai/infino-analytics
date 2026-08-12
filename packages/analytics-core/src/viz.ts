@@ -123,7 +123,8 @@ export const NewVisualizationSchema = VisualizationSchema.omit({
 }).extend({
   id: z.string().optional(),
 });
-export type NewVisualization = z.infer<typeof NewVisualizationSchema>;
+/** Input type: fields with defaults are optional — the parse fills them. */
+export type NewVisualization = z.input<typeof NewVisualizationSchema>;
 
 export const NewDashboardSchema = DashboardSchema.omit({
   id: true,
@@ -132,7 +133,7 @@ export const NewDashboardSchema = DashboardSchema.omit({
 }).extend({
   id: z.string().optional(),
 });
-export type NewDashboard = z.infer<typeof NewDashboardSchema>;
+export type NewDashboard = z.input<typeof NewDashboardSchema>;
 
 export function newVisualization(input: NewVisualization): Visualization {
   const now = new Date().toISOString();

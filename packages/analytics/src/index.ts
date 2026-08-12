@@ -248,24 +248,20 @@ function buildVisualizations(storage: StorageAdapter, client: InfinoClient): Vis
     },
     delete: (id) => store.delete(id),
     async execute(idOrSpec, opts = {}) {
-      let spec: NewVisualization;
-      let saved: Filter[] = [];
-      let timeRange = opts.timeRange;
+      // Both branches produce the defaults-filled document shape: loaded
+      // from storage, or parsed from the inline (ephemeral) spec.
+      let spec: Omit<Visualization, "id" | "created_at" | "updated_at">;
       if (typeof idOrSpec === "string") {
         const doc = await store.get(idOrSpec);
         if (!doc) throw new Error(`unknown visualization: ${idOrSpec}`);
         spec = doc;
-        saved = doc.filters;
-        timeRange ??= doc.time_range;
       } else {
         spec = NewVisualizationSchema.parse(idOrSpec);
-        saved = spec.filters ?? [];
-        timeRange ??= spec.time_range;
       }
       return execute(client, spec, {
-        savedFilters: saved,
+        savedFilters: spec.filters,
         filters: opts.filters,
-        timeRange,
+        timeRange: opts.timeRange ?? spec.time_range,
       });
     },
   };
