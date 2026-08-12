@@ -71,7 +71,6 @@ packages/analytics        the facade: new Analytics({...}) — ask() + threads (
                           visualizations + dashboards (persistence API) on one client
 apps/server               the facade over HTTP: POST /api/chat (SSE) + demo UI host
 apps/web                  demo chat UI (React + ECharts); <Chart> reads only binding
-examples/                 runnable library-level integrations (single ask, sessions)
 ```
 
 The render contract in one line: the server resolves `metadata.binding`
