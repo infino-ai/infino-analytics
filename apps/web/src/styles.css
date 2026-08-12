@@ -329,24 +329,42 @@ body {
   min-width: 0;
 }
 
-/* SQL as a visible code snippet: caption + fenced block */
+/* The SQL behind a figure: collapsed disclosure under the chart card;
+   expanding eases open the fenced snippet. */
 .sqlblock {
-  margin: 14px 0;
+  margin: 6px 0 14px;
   animation: settle 0.35s ease-out;
 }
 .sqlblock figcaption {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+.sqlhead {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 0;
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0.16em;
   color: var(--ink-faint);
   text-transform: uppercase;
-  margin-bottom: 5px;
 }
+.sqlhead:hover { color: var(--ink-dim); }
+.sqlhead .caret { font-size: 11px; }
+.sqlwrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.25s ease;
+}
+.sqlblock.open .sqlwrap { grid-template-rows: 1fr; }
+.sqlinner { overflow: hidden; min-height: 0; }
 .sqlblock pre {
-  margin: 0;
+  margin: 5px 0 0;
   padding: 12px 14px;
   background: var(--paper-raise);
   border: 1px solid var(--rule);
@@ -360,6 +378,8 @@ body {
   color: var(--ink);
   white-space: pre;
 }
+/* the copy affordance is always available while the snippet is open */
+.sqlblock.open .copy { opacity: 1; }
 
 .answer {
   margin: 16px 0 0;

@@ -27,6 +27,30 @@ function Md({ text }: { text: string }) {
   );
 }
 
+// The SQL behind a figure, tucked behind a disclosure: the result is the
+// first-class thing; what ran is one click away.
+function SqlReveal({ sql }: { sql: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <figure className={open ? "sqlblock open" : "sqlblock"}>
+      <figcaption>
+        <button className="sqlhead" onClick={() => setOpen(!open)}>
+          <Chevron className="caret" open={open} />
+          SQL
+        </button>
+        {open && <CopyButton text={sql} />}
+      </figcaption>
+      <div className="sqlwrap">
+        <div className="sqlinner">
+          <pre>
+            <code>{sql}</code>
+          </pre>
+        </div>
+      </div>
+    </figure>
+  );
+}
+
 function CopyButton({ text }: { text: string }) {
   const [done, setDone] = useState(false);
   return (
@@ -379,11 +403,7 @@ export default function App() {
                               {turn.status || "working"}
                             </span>
                           ) : (
-                            <span className="worked">
-                              {turn.elapsed !== undefined
-                                ? `Worked for ${turn.elapsed.toFixed(1)}s · ${steps.length} steps`
-                                : `${steps.length} steps`}
-                            </span>
+                            <span className="worked">{steps.length} steps</span>
                           )}
                         </button>
                         <div className="activity-wrap">
@@ -426,17 +446,7 @@ export default function App() {
                       return (
                         <div key={`fig${figNo}`}>
                           <ChartCard event={chart} />
-                          {sql && (
-                            <figure className="sqlblock">
-                              <figcaption>
-                                SQL
-                                <CopyButton text={sql} />
-                              </figcaption>
-                              <pre>
-                                <code>{sql}</code>
-                              </pre>
-                            </figure>
-                          )}
+                          {sql && <SqlReveal sql={sql} />}
                         </div>
                       );
                     })}
