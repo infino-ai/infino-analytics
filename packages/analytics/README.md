@@ -170,7 +170,8 @@ status → progress → step → step_done → … → sql → chart → summary
 A `chart` event carries everything a renderer needs:
 
 - `spec` (`VizSpec`): the saved-object shape. `chart.type` is one of
-  `bar | line | area | pie | metric | table | heatmap | scatter | combo`;
+  `bar | horizontalBar | line | area | pie | metric | table | heatmap |
+  scatter | combo`;
   `title`, `source.raw_query`, and axis `mapping` describe intent
   (`mapping.y2` puts columns on a secondary right axis; for heatmap, `x` is
   the column axis, `series` the row axis, `y[0]` the cell value).
@@ -227,10 +228,36 @@ Same CRUD shape (`create/get/list/put/update/delete`). A dashboard is
 layout + references: panels point at visualizations **by id** (dangling
 references are rejected at write time), plus `markdown` and `divider`
 panels, dashboard-level `filters`/`time_range`, and a 48-column grid
-`layout` per panel that round-trips untouched. There is deliberately no
-dashboard-execute: consumers fan out one `visualizations.execute()` per
-panel, passing the dashboard's filters and time range; layout and
-rendering are theirs.
+`layout` per panel that round-trips untouched.
+
+`dashboards.execute(id, {filters?, timeRange?, concurrency?})` resolves
+every panel in one call: each visualization panel executes in parallel
+with the dashboard's filters and time range (overridable), and returns
+`{kind, layout, title_override, viz, data, error}` per panel in dashboard
+order. A failing panel lands in its own `error`; the dashboard still
+renders. Over HTTP there is deliberately no dashboard-execute route — the
+reference web app fans out per panel the same way this method does.
+
+### Rendering: `toEChartsOption(spec, result, theme?)`
+
+The step after execute. A pure function mapping any visualization (or
+VizSpec) plus its `ExecuteResult` into a render plan:
+
+```ts
+const plan = toEChartsOption(viz, data);
+// { kind: "echarts", option }  → echarts.setOption(plan.option)
+// { kind: "table", columns, rows }   → your table component
+// { kind: "metric", value, label, text } → your big-number component
+```
+
+It reads only `metadata.binding`, covers every chart type in the enum,
+and degrades unresolvable grids/scatters to a table. The optional `theme`
+overrides colors and fonts to match your design system. Call it wherever
+suits your architecture: in your backend (ship `plan.option` to your
+frontend as JSON) via this package's main entry, or in the browser via
+`@infino-ai/analytics/echarts` — the same function from an entry that
+carries none of the server-side code. The demo app's chart component is
+its worked example.
 
 ### Over HTTP
 

@@ -52,6 +52,11 @@ export {
   NewVisualizationSchema,
   NewDashboardSchema,
 } from "@infino-ai/analytics-core";
+// The reference renderer, legacy-style: compute chart options wherever you
+// run this package (typically your backend; ship plan.option as JSON).
+// Browser bundles import the same function from "@infino-ai/analytics/echarts".
+export { toEChartsOption } from "./echarts.js";
+export type { RenderPlan, ChartTheme } from "./echarts.js";
 
 export interface AnalyticsConfig {
   /** Infino target: hosted https://<host>/<database>. The apiKey falls back
@@ -97,6 +102,23 @@ export interface Visualizations {
   execute(idOrSpec: string | NewVisualization, opts?: ExecuteVizOptions): Promise<ExecuteResult>;
 }
 
+/** One resolved dashboard panel: layout + document + data, or a contained
+ * error — a failed panel never fails the dashboard. */
+export interface DashboardPanelResult {
+  id?: string;
+  kind: "visualization" | "markdown" | "divider";
+  layout?: { x: number; y: number; w: number; h: number };
+  title_override?: string;
+  /** Populated for visualization panels (null on error). */
+  viz: Visualization | null;
+  data: ExecuteResult | null;
+  error: { message: string } | null;
+  /** markdown panels */
+  content?: string;
+  /** divider panels */
+  label?: string;
+}
+
 export interface Dashboards {
   create(input: NewDashboard): Promise<Dashboard>;
   get(id: string): Promise<Dashboard | null>;
@@ -104,6 +126,14 @@ export interface Dashboards {
   put(id: string, input: NewDashboard): Promise<Dashboard>;
   update(id: string, patch: unknown): Promise<Dashboard>;
   delete(id: string): Promise<void>;
+  /** Resolve every panel in one call: each visualization panel executes
+   * with the dashboard's filters and time range (overridable), in parallel
+   * with per-panel error containment. Returns panels in dashboard order —
+   * lay them out and render. */
+  execute(
+    id: string,
+    opts?: ExecuteVizOptions & { concurrency?: number },
+  ): Promise<DashboardPanelResult[]>;
 }
 
 /**
@@ -145,7 +175,7 @@ export class Analytics {
     this.threads = this.storage.threads;
     this.client = new InfinoClient(config.infino);
     this.visualizations = buildVisualizations(this.storage, this.client);
-    this.dashboards = buildDashboards(this.storage);
+    this.dashboards = buildDashboards(this.storage, this.visualizations);
   }
 
   /** Create a thread and return its id — sugar over threads.create() that
@@ -267,7 +297,7 @@ function buildVisualizations(storage: StorageAdapter, client: InfinoClient): Vis
   };
 }
 
-function buildDashboards(storage: StorageAdapter): Dashboards {
+function buildDashboards(storage: StorageAdapter, visualizations: Visualizations): Dashboards {
   const store = storage.dashboards;
 
   // Validation improvement over legacy: dashboards reference
@@ -314,5 +344,49 @@ function buildDashboards(storage: StorageAdapter): Dashboards {
       return doc;
     },
     delete: (id) => store.delete(id),
+
+    async execute(id, opts = {}) {
+      const dash = await store.get(id);
+      if (!dash) throw new Error(`unknown dashboard: ${id}`);
+      const filters = opts.filters ?? dash.filters;
+      const timeRange = opts.timeRange ?? dash.time_range;
+
+      const resolve = async (panel: Dashboard["panels"][number]): Promise<DashboardPanelResult> => {
+        const base: DashboardPanelResult = {
+          id: panel.id,
+          kind: panel.kind,
+          viz: null,
+          data: null,
+          error: null,
+        };
+        if (panel.kind === "markdown") return { ...base, layout: panel.layout, content: panel.content };
+        if (panel.kind === "divider") return { ...base, label: panel.label };
+        base.layout = panel.layout;
+        base.title_override = panel.title_override;
+        try {
+          const viz = await visualizations.get(panel.viz_id);
+          if (!viz) throw new Error(`unknown visualization: ${panel.viz_id}`);
+          base.viz = viz;
+          base.data = await visualizations.execute(panel.viz_id, { filters, timeRange });
+        } catch (err) {
+          base.error = { message: err instanceof Error ? err.message : String(err) };
+        }
+        return base;
+      };
+
+      // Bounded parallel fan-out, results kept in dashboard order.
+      const concurrency = Math.max(1, opts.concurrency ?? 8);
+      const results: DashboardPanelResult[] = new Array(dash.panels.length);
+      let next = 0;
+      await Promise.all(
+        Array.from({ length: Math.min(concurrency, dash.panels.length) }, async () => {
+          while (next < dash.panels.length) {
+            const i = next++;
+            results[i] = await resolve(dash.panels[i]);
+          }
+        }),
+      );
+      return results;
+    },
   };
 }

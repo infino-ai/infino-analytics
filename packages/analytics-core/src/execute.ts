@@ -134,7 +134,7 @@ function resolveBinding(
     return binding;
   }
 
-  // bar | line | area | pie | heatmap | scatter | combo
+  // bar | horizontalBar | line | area | pie | heatmap | scatter | combo
   binding.x = resolveColumn(spec.mapping.x, columns);
   if (!binding.x) {
     warnings.push({
@@ -219,7 +219,10 @@ function resolveBinding(
     });
   }
 
-  if (binding.x && (chartType === "bar" || chartType === "pie")) {
+  if (
+    binding.x &&
+    (chartType === "bar" || chartType === "horizontalBar" || chartType === "pie")
+  ) {
     const distinct = new Set(rows.map((r) => r[binding.x as string])).size;
     if (distinct > HIGH_CARDINALITY_X) {
       warnings.push({

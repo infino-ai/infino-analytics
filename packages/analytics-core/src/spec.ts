@@ -9,6 +9,7 @@ import { z } from "zod";
 // every conforming renderer knows how to draw it, including re-execution
 // from a persisted spec. Semantics:
 //   bar | line | area  categorical/temporal x, numeric y[] (y2[] = right axis)
+//   horizontalBar      bar with the axes swapped: categories on y, values on x
 //   pie                categorical x, one numeric y
 //   metric             a single number (y[0] or the sole numeric column)
 //   table              raw rows, no mapping
@@ -17,6 +18,7 @@ import { z } from "zod";
 //   combo              y[] as bars on the left axis, y2[] as lines on the right
 export const CHART_TYPES = [
   "bar",
+  "horizontalBar",
   "line",
   "area",
   "pie",

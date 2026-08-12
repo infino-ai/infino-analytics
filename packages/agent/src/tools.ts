@@ -20,7 +20,7 @@ const CreateChartInput = {
   title: z.string().describe("Short human title for the chart"),
   chart_type: z
     .enum(CHART_TYPES)
-    .describe("bar | line | area | pie | metric | table | heatmap | scatter | combo"),
+    .describe("bar | horizontalBar | line | area | pie | metric | table | heatmap | scatter | combo"),
   table: z.string().describe("Source table name"),
   sql: z.string().describe("The SELECT that produces the chart's data. Alias every aggregate."),
   x: z.string().optional().describe("Result column for the x axis / category (heatmap: column axis; scatter: numeric)"),
@@ -39,7 +39,7 @@ const CreateChartInput = {
 export function buildLocalTools(client: InfinoClient, emit: (e: ChatEvent) => void) {
   const createChart = tool(
     "create_chart",
-    "Execute a SQL query and render the result to the user as a chart or table — the ONLY way to show data to the user. Chart intuition: single number → metric; time on x → line/area; categories → bar (bounded with a top-N LIMIT so it stays readable); proportions under ~8 slices → pie; raw records → table; two categorical dimensions + one measure (hour × weekday, feature × bucket) → heatmap with x = column axis, series = row axis, y = the cell value (SQL returns one row per cell); relationship between two numeric measures → scatter with numeric x and y, optional series to color point groups; a measure and a rate/price on different scales → combo (or line/bar) with y on the left axis and y2 on the right — y2 renders as lines over combo's y bars. The x/y/y2/series mapping must use the EXACT column aliases from the SELECT (alias every aggregate, e.g. COUNT(*) AS n) — the renderer binds by result-column name. Returns the resolved binding, row count, warnings, and a small sample; warnings mean adjust the SQL or mapping and call again.",
+    "Execute a SQL query and render the result to the user as a chart or table — the ONLY way to show data to the user. Chart intuition: single number → metric; time on x → line/area; categories → bar, or horizontalBar when category names are long or it is a ranking (bounded with a top-N LIMIT so it stays readable); proportions under ~8 slices → pie; raw records → table; two categorical dimensions + one measure (hour × weekday, feature × bucket) → heatmap with x = column axis, series = row axis, y = the cell value (SQL returns one row per cell); relationship between two numeric measures → scatter with numeric x and y, optional series to color point groups; a measure and a rate/price on different scales → combo (or line/bar) with y on the left axis and y2 on the right — y2 renders as lines over combo's y bars. The x/y/y2/series mapping must use the EXACT column aliases from the SELECT (alias every aggregate, e.g. COUNT(*) AS n) — the renderer binds by result-column name. Returns the resolved binding, row count, warnings, and a small sample; warnings mean adjust the SQL or mapping and call again.",
     CreateChartInput,
     async (args) => {
       const parsed = VizSpecSchema.safeParse({
