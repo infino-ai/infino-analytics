@@ -1,3 +1,35 @@
+@import "tailwindcss";
+
+/* shadcn-style tokens on Tailwind v4, mapped onto the kit's palette below —
+   the vendored components in src/components/ui read these, so they arrive
+   already wearing the theme. */
+@theme inline {
+  --color-background: var(--paper);
+  --color-foreground: var(--ink);
+  --color-card: #ffffff;
+  --color-card-foreground: var(--ink);
+  --color-popover: #ffffff;
+  --color-popover-foreground: var(--ink);
+  --color-muted: var(--paper-raise);
+  --color-muted-foreground: var(--ink-dim);
+  --color-border: var(--rule);
+  --color-input: var(--rule-dark);
+  --color-primary: var(--ink);
+  --color-primary-foreground: var(--paper);
+  --color-secondary: var(--paper-raise);
+  --color-secondary-foreground: var(--ink);
+  --color-accent: var(--accent-soft);
+  --color-accent-foreground: var(--accent);
+  --color-destructive: var(--red);
+  --color-ring: var(--accent);
+  --color-hover: var(--accent-soft);
+  --radius-lg: 8px;
+  --radius-md: 6px;
+  --radius-sm: 4px;
+  --font-sans: "Archivo", -apple-system, sans-serif;
+  --font-mono: "Fragment Mono", ui-monospace, monospace;
+}
+
 /* Fino demo — light "datasheet" theme.
    Typeset like the technical documents engineers actually read, in the
    register of a modern analytics notebook: paper ground, ink text, a
@@ -79,22 +111,6 @@ body {
   padding: 14px 10px 14px 20px;
   border-right: 1px solid var(--rule);
 }
-
-.newthread {
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  text-align: left;
-  color: var(--ink);
-  background: none;
-  border: 1px solid var(--rule-dark);
-  border-radius: 7px;
-  padding: 7px 10px;
-  margin-right: 10px;
-  cursor: pointer;
-}
-.newthread:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-.newthread:disabled { opacity: 0.45; cursor: default; }
 
 .threadlist {
   margin-top: 12px;
@@ -437,6 +453,9 @@ body {
 .md h3 { font-size: 15px; }
 .md ul,
 .md ol { margin: 0 0 12px; padding-left: 22px; }
+/* Tailwind's preflight strips list markers; markdown wants them back. */
+.md ul { list-style: disc; }
+.md ol { list-style: decimal; }
 .md li { margin: 3px 0; }
 .md li::marker { color: var(--ink-faint); }
 .md a { color: var(--cobalt); text-decoration: none; border-bottom: 1px solid var(--rule); }
@@ -670,26 +689,6 @@ table.data tr:hover td { background: var(--accent-soft); }
   overflow-y: auto;
 }
 .inputrow textarea::placeholder { color: var(--ink-faint); }
-.inputrow button {
-  font-family: var(--mono);
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  background: var(--ink);
-  color: var(--paper);
-  border: none;
-  border-radius: 7px;
-  padding: 11px 22px;
-  cursor: pointer;
-  transition: background 0.12s;
-  align-self: flex-end;
-}
-.inputrow button:hover:not(:disabled) { background: var(--accent); }
-.inputrow button:disabled { opacity: 0.3; cursor: default; }
-.inputrow button.stop {
-  background: none;
-  color: var(--accent);
-  border: 1.5px solid var(--accent);
-}
 
 /* empty state */
 .empty { margin-top: 14vh; text-align: center; }
@@ -841,103 +840,3 @@ table.data tr:hover td { background: var(--accent-soft); }
 @media (max-width: 1100px) {
   .dashgrid .panel { grid-column: span 48 !important; }
 }
-
-
-/* ── add-to-dashboard menu on chart cards ───────────────── */
-
-.dashmenu-wrap { position: relative; display: inline-flex; }
-.dashmenu-backdrop {
-  position: fixed;
-  inset: 0;
-  background: none;
-  border: none;
-  cursor: default;
-  z-index: 20;
-}
-.dashmenu {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 21;
-  min-width: 240px;
-  background: #fff;
-  border: 1px solid var(--ink);
-  box-shadow: 4px 4px 0 var(--rule);
-  padding: 5px;
-}
-.dashmenu-item {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  width: 100%;
-  text-align: left;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 8px 10px;
-  font-family: var(--mono);
-  font-size: 11.5px;
-  color: var(--ink);
-  letter-spacing: 0.01em;
-  text-transform: none;
-}
-.dashmenu-item:hover { background: var(--accent-soft); color: var(--accent); }
-.dashmenu-title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.dashmenu-meta { color: var(--ink-faint); font-size: 10px; }
-.dashmenu-newbtn { border-top: 1px solid var(--rule); color: var(--ink-dim); }
-.dashmenu-note {
-  padding: 8px 10px;
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--ink-faint);
-}
-.dashmenu-newform {
-  display: flex;
-  gap: 6px;
-  padding: 6px;
-  border-top: 1px solid var(--rule);
-}
-.dashmenu-newform input {
-  flex: 1;
-  min-width: 0;
-  font-family: var(--mono);
-  font-size: 11.5px;
-  color: var(--ink);
-  background: var(--paper);
-  border: 1px solid var(--rule-dark);
-  padding: 6px 8px;
-  outline: none;
-}
-.dashmenu-newform input:focus { border-color: var(--accent); }
-.dashmenu-newform button {
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  background: var(--ink);
-  color: var(--paper);
-  border: none;
-  padding: 0 12px;
-  cursor: pointer;
-}
-.dashmenu-newform button:disabled { opacity: 0.4; cursor: default; }
-.cardaction.added { color: var(--green); border-color: var(--rule); cursor: default; }
-
-/* panel skeleton while its execute is in flight */
-.panel-loader {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  min-height: 220px;
-  font-family: var(--mono);
-  font-size: 11.5px;
-  color: var(--ink-faint);
-}
-.panel-loader .working-spin { font-size: 14px; color: var(--accent); }

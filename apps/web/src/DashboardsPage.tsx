@@ -10,8 +10,9 @@ import {
   type Visualization,
 } from "./api";
 import { ChartCard } from "./Chart";
-import { Spinner } from "./icons";
 import { Md } from "./ui";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // Dashboards, rendered per the contract: the client fans out one execute
 // per visualization panel (with the dashboard's filters and time range) and
@@ -55,9 +56,14 @@ function DashboardList() {
                   {d.panels.length} panel{d.panels.length === 1 ? "" : "s"}
                 </span>
               </a>
-              <button className="cardaction" onClick={() => remove(d.id)} title="Delete">
+              <Button
+                variant="ghost"
+                size="xs"
+                className="font-mono normal-case tracking-normal"
+                onClick={() => remove(d.id)}
+              >
                 delete
-              </button>
+              </Button>
             </div>
           ))}
         </div>
@@ -161,7 +167,8 @@ function DashboardView({ id }: { id: string }) {
                 <div className="error">{res.error}</div>
               ) : (
                 // Skeleton while the panel's execute is in flight: the card
-                // frame with its title, a spinner where the figure will be.
+                // frame with its title, a pulsing block where the figure
+                // will land.
                 <div className="card">
                   <div className="card-head">
                     <span className="card-title">
@@ -169,9 +176,8 @@ function DashboardView({ id }: { id: string }) {
                     </span>
                     {viz && <span className="card-kind">{viz.chart.type}</span>}
                   </div>
-                  <div className="card-body panel-loader">
-                    <Spinner className="working-spin" />
-                    resolving panel…
+                  <div className="card-body">
+                    <Skeleton className="my-2 h-[230px] w-full" />
                   </div>
                 </div>
               )}

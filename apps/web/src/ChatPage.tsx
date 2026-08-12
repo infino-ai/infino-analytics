@@ -17,6 +17,15 @@ import {
 import { ChartCard } from "./Chart";
 import { Check, Chevron, Cross, Spinner, ToolIcon } from "./icons";
 import { CopyButton, Md } from "./ui";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 
 const FALLBACK_SUGGESTIONS = ["What data do I have?", "Show me a trend over time"];
 
@@ -57,12 +66,13 @@ function AddToDashboard({ spec }: { spec: Extract<ChatEvent, { type: "chart" }>[
   const [state, setState] = useState<"idle" | "busy" | "done">("idle");
   const [addedTo, setAddedTo] = useState("");
 
-  function toggle() {
+  function onOpenChange(next: boolean) {
     if (state === "busy") return;
-    setOpen(!open);
-    if (!open) {
+    setOpen(next);
+    if (next) {
       setDashboards(null);
       setNaming(false);
+      setTitle("");
       listDashboards().then(setDashboards).catch(() => setDashboards([]));
     }
   }
@@ -109,51 +119,58 @@ function AddToDashboard({ spec }: { spec: Extract<ChatEvent, { type: "chart" }>[
   }
 
   return (
-    <span className="dashmenu-wrap">
-      <button className="cardaction" onClick={toggle} disabled={state === "busy"}>
-        {state === "busy" ? "adding…" : "+ dashboard"}
-      </button>
-      {open && (
-        <>
-          <button className="dashmenu-backdrop" onClick={() => setOpen(false)} aria-label="close" />
-          <div className="dashmenu">
-            {dashboards === null && <div className="dashmenu-note">loading…</div>}
-            {dashboards?.map((d) => (
-              <button className="dashmenu-item" key={d.id} onClick={() => addTo(d)}>
-                <span className="dashmenu-title">{d.title}</span>
-                <span className="dashmenu-meta">
-                  {d.panels.length} panel{d.panels.length === 1 ? "" : "s"}
-                </span>
-              </button>
-            ))}
-            {dashboards?.length === 0 && <div className="dashmenu-note">no dashboards yet</div>}
-            {naming ? (
-              <form
-                className="dashmenu-newform"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void createAndAdd();
-                }}
-              >
-                <input
-                  autoFocus
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="dashboard title"
-                />
-                <button type="submit" disabled={!title.trim()}>
-                  create
-                </button>
-              </form>
-            ) : (
-              <button className="dashmenu-item dashmenu-newbtn" onClick={() => setNaming(true)}>
-                + new dashboard…
-              </button>
-            )}
-          </div>
-        </>
-      )}
-    </span>
+    <DropdownMenu open={open} onOpenChange={onOpenChange}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="xs" className="ml-3 font-mono normal-case tracking-normal" disabled={state === "busy"}>
+          {state === "busy" ? "adding…" : "add to dashboard"}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-60 font-mono">
+        {dashboards === null && <DropdownMenuItem disabled>loading…</DropdownMenuItem>}
+        {dashboards?.map((d) => (
+          <DropdownMenuItem key={d.id} onSelect={() => void addTo(d)}>
+            <span className="flex-1 truncate">{d.title}</span>
+            <span className="text-[10px] text-muted-foreground">
+              {d.panels.length} panel{d.panels.length === 1 ? "" : "s"}
+            </span>
+          </DropdownMenuItem>
+        ))}
+        {dashboards?.length === 0 && <DropdownMenuItem disabled>no dashboards yet</DropdownMenuItem>}
+        <DropdownMenuSeparator />
+        {naming ? (
+          <form
+            className="flex gap-1.5 p-1.5"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void createAndAdd();
+            }}
+          >
+            <Input
+              autoFocus
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              // Radix menus grab keystrokes for typeahead; the title field
+              // keeps its own.
+              onKeyDown={(e) => e.stopPropagation()}
+              placeholder="dashboard title"
+              className="h-7 font-mono text-xs"
+            />
+            <Button type="submit" size="sm" disabled={!title.trim()}>
+              create
+            </Button>
+          </form>
+        ) : (
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              setNaming(true);
+            }}
+          >
+            + new dashboard…
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -477,9 +494,15 @@ export default function ChatPage() {
   return (
     <div className="body">
       <aside className="sidebar">
-        <button className="newthread" onClick={newThread} disabled={busy}>
-          + new thread
-        </button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="mr-2.5 justify-start font-mono normal-case tracking-normal"
+          onClick={newThread}
+          disabled={busy}
+        >
+          + new
+        </Button>
         <nav className="threadlist">
           {threads.map((t) => (
             <div className={t.id === activeId ? "threaditem active" : "threaditem"} key={t.id}>
@@ -495,13 +518,13 @@ export default function ChatPage() {
                 className="threadkill"
                 onClick={() => removeThread(t.id)}
                 disabled={busy}
-                title="delete thread"
+                title="delete"
               >
                 ×
               </button>
             </div>
           ))}
-          {threads.length === 0 && <div className="threadempty">no threads yet</div>}
+          {threads.length === 0 && <div className="threadempty">nothing here yet</div>}
         </nav>
       </aside>
 
@@ -562,13 +585,18 @@ export default function ChatPage() {
               disabled={busy}
             />
             {busy ? (
-              <button type="button" className="stop" onClick={stop}>
-                STOP
-              </button>
+              <Button
+                type="button"
+                variant="outline"
+                className="self-end border-destructive font-mono text-destructive"
+                onClick={stop}
+              >
+                stop
+              </Button>
             ) : (
-              <button type="submit" disabled={!input.trim()}>
-                ASK →
-              </button>
+              <Button type="submit" className="self-end font-mono" disabled={!input.trim()}>
+                ask →
+              </Button>
             )}
           </form>
         </div>
