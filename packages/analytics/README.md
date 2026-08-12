@@ -1,9 +1,9 @@
 # @infino-ai/analytics
 
 The facade of the kit: one client object your backend embeds. It gives you
-conversational analytics over an Infino database today, and the
-visualization/dashboard persistence API next (both surfaces share the same
-chart contract, so a chart born in chat can later live on a dashboard).
+conversational analytics over an Infino database, and the
+visualization/dashboard persistence API. Both surfaces share the same
+chart contract, so a chart born in chat can be pinned to a dashboard.
 
 ```ts
 import { Analytics } from "@infino-ai/analytics";
