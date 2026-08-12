@@ -122,11 +122,11 @@ function AddToDashboard({ spec }: { spec: Extract<ChatEvent, { type: "chart" }>[
     <DropdownMenu open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="xs" className="ml-3 font-mono normal-case tracking-normal" disabled={state === "busy"}>
-          {state === "busy" ? "adding…" : "add to dashboard"}
+          {state === "busy" ? "Adding…" : "Add to dashboard"}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-60 font-mono">
-        {dashboards === null && <DropdownMenuItem disabled>loading…</DropdownMenuItem>}
+        {dashboards === null && <DropdownMenuItem disabled>Loading…</DropdownMenuItem>}
         {dashboards?.map((d) => (
           <DropdownMenuItem key={d.id} onSelect={() => void addTo(d)}>
             <span className="flex-1 truncate">{d.title}</span>
@@ -135,7 +135,7 @@ function AddToDashboard({ spec }: { spec: Extract<ChatEvent, { type: "chart" }>[
             </span>
           </DropdownMenuItem>
         ))}
-        {dashboards?.length === 0 && <DropdownMenuItem disabled>no dashboards yet</DropdownMenuItem>}
+        {dashboards?.length === 0 && <DropdownMenuItem disabled>No dashboards yet</DropdownMenuItem>}
         <DropdownMenuSeparator />
         {naming ? (
           <form
@@ -152,11 +152,11 @@ function AddToDashboard({ spec }: { spec: Extract<ChatEvent, { type: "chart" }>[
               // Radix menus grab keystrokes for typeahead; the title field
               // keeps its own.
               onKeyDown={(e) => e.stopPropagation()}
-              placeholder="dashboard title"
+              placeholder="Dashboard title"
               className="h-7 font-mono text-xs"
             />
             <Button type="submit" size="sm" disabled={!title.trim()}>
-              create
+              Create
             </Button>
           </form>
         ) : (
@@ -166,7 +166,7 @@ function AddToDashboard({ spec }: { spec: Extract<ChatEvent, { type: "chart" }>[
               setNaming(true);
             }}
           >
-            + new dashboard…
+            + New dashboard…
           </DropdownMenuItem>
         )}
       </DropdownMenuContent>
@@ -501,7 +501,7 @@ export default function ChatPage() {
           onClick={newThread}
           disabled={busy}
         >
-          + new
+          + New
         </Button>
         <nav className="threadlist">
           {threads.map((t) => (
@@ -524,7 +524,7 @@ export default function ChatPage() {
               </button>
             </div>
           ))}
-          {threads.length === 0 && <div className="threadempty">nothing here yet</div>}
+          {threads.length === 0 && <div className="threadempty">Nothing here yet</div>}
         </nav>
       </aside>
 
@@ -535,7 +535,7 @@ export default function ChatPage() {
               <div className="big">
                 Ask your <em>data</em> anything.
               </div>
-              <div>answers arrive as figures, tables, and plain language</div>
+              <div>Answers arrive as figures, tables, and plain language</div>
             </div>
           )}
 
@@ -581,7 +581,7 @@ export default function ChatPage() {
                   ask(input);
                 }
               }}
-              placeholder="ask about your data…    (Shift+Enter for a new line)"
+              placeholder="Ask about your data…    (Shift+Enter for a new line)"
               disabled={busy}
             />
             {busy ? (
@@ -591,11 +591,11 @@ export default function ChatPage() {
                 className="self-end border-destructive font-mono text-destructive"
                 onClick={stop}
               >
-                stop
+                Stop
               </Button>
             ) : (
               <Button type="submit" className="self-end font-mono" disabled={!input.trim()}>
-                ask →
+                Ask →
               </Button>
             )}
           </form>

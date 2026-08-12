@@ -35,7 +35,7 @@ function DashboardList() {
     setItems((d) => (d ? d.filter((x) => x.id !== id) : d));
   }
 
-  if (items === null) return <div className="page pagenote">loading…</div>;
+  if (items === null) return <div className="page pagenote">Loading…</div>;
 
   return (
     <div className="page">
@@ -44,7 +44,7 @@ function DashboardList() {
           <div className="big">
             No <em>dashboards</em> yet.
           </div>
-          <div>add a saved visualization to a dashboard, or POST to /dashboards</div>
+          <div>Add a chart from a Fino conversation, or POST to /dashboards</div>
         </div>
       ) : (
         <div className="dashlist">
@@ -62,7 +62,7 @@ function DashboardList() {
                 className="font-mono normal-case tracking-normal"
                 onClick={() => remove(d.id)}
               >
-                delete
+                Delete
               </Button>
             </div>
           ))}
@@ -114,16 +114,16 @@ function DashboardView({ id }: { id: string }) {
   if (missing)
     return (
       <div className="page pagenote">
-        unknown dashboard — <a href="#/dashboards">back to the list</a>
+        Unknown dashboard. <a href="#/dashboards">Back to the list</a>
       </div>
     );
-  if (!dash) return <div className="page pagenote">loading…</div>;
+  if (!dash) return <div className="page pagenote">Loading…</div>;
 
   return (
     <div className="page">
       <div className="dashhead">
         <a className="dashback" href="#/dashboards">
-          ← dashboards
+          ← Dashboards
         </a>
         <h1 className="dashname">{dash.title}</h1>
         {dash.time_range && (

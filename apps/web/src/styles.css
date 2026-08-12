@@ -343,6 +343,7 @@ body {
 
 /* the live indicator at the foot of a running turn */
 .working-line {
+  text-transform: capitalize;
   display: flex;
   align-items: center;
   gap: 8px;

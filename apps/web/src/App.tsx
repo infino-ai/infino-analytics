@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import ChatPage from "./ChatPage";
 import DashboardsPage from "./DashboardsPage";
-import { FinoMark } from "./icons";
+import { Logo } from "@/components/ui/logo";
 
 // The app shell: header with the surface nav, and a tiny hash router — no
 // routing dependency, nothing for a fork to untangle. Routes:
@@ -18,8 +18,8 @@ function useRoute(): string {
 }
 
 const NAV = [
-  { path: "/chat", label: "fino" },
-  { path: "/dashboards", label: "dashboards" },
+  { path: "/chat", label: "Fino" },
+  { path: "/dashboards", label: "Dashboards" },
 ];
 
 export default function App() {
@@ -31,10 +31,8 @@ export default function App() {
   return (
     <div className="app">
       <header className="header">
-        <span className="mark">
-          <FinoMark />
-        </span>
-        <span className="wordmark">Infino Analytics</span>
+        <Logo className="h-[17px] w-auto self-center" />
+        <span className="wordmark">Analytics</span>
         <nav className="nav">
           {NAV.map((n) => (
             <a className={section === n.path ? "navlink active" : "navlink"} href={`#${n.path}`} key={n.path}>
