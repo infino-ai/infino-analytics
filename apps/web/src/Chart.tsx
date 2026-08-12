@@ -6,14 +6,13 @@ import type { ChartEvent } from "./api";
 // find columns — never derive names from the SQL or the spec, the server
 // already resolved them against the actual result.
 
-// Dark-theme chart palette. Kept in sync with the CSS tokens in styles.css
-// (same names, same intent). Series colors are lifted for legibility on the
-// near-black ground; the first is the vermilion accent.
-const PALETTE = ["#f0532f", "#6f9aff", "#3fbf8f", "#c88ae0", "#e8b34a", "#c9c7c0"];
-const AXIS_COLOR = "#66655f";
-const SPLIT_COLOR = "#2c2c33";
-const INK = "#e9e7e1";
-const SURFACE = "#1f1f25";
+// Light-theme chart palette. Kept in sync with the CSS tokens in styles.css
+// (same names, same intent); the first series is the vermilion accent.
+const PALETTE = ["#d23b1e", "#2b50aa", "#1f8a70", "#8f3e97", "#c98a00", "#1b1b1f"];
+const AXIS_COLOR = "#97968f";
+const SPLIT_COLOR = "#e8e6dd";
+const INK = "#1b1b1f";
+const SURFACE = "#ffffff";
 const MAX_TABLE_ROWS = 50;
 
 const nf = new Intl.NumberFormat("en-US");
@@ -23,7 +22,13 @@ const nfCompact = new Intl.NumberFormat("en-US", { notation: "compact", maximumF
 export function ChartCard({ event }: { event: ChartEvent }) {
   const { spec, result } = event;
   const kind = spec.chart.type;
-  const warnings = result.metadata.warnings;
+  const { warnings, binding } = result.metadata;
+
+  // Degrade-never-fail on the render side too: a grid or scatter whose
+  // binding didn't resolve still shows its data as a table.
+  const unrenderable =
+    (kind === "heatmap" && (!binding.x || !binding.series || binding.y.length === 0)) ||
+    (kind === "scatter" && (!binding.x || binding.y.length === 0));
 
   return (
     <div className="card">
@@ -34,7 +39,7 @@ export function ChartCard({ event }: { event: ChartEvent }) {
       <div className="card-body">
         {kind === "metric" ? (
           <Metric event={event} />
-        ) : kind === "table" ? (
+        ) : kind === "table" || unrenderable ? (
           <DataTable event={event} />
         ) : (
           <Echart event={event} />
@@ -111,8 +116,19 @@ function Echart({ event }: { event: ChartEvent }) {
     };
   }, [event]);
 
-  return <div ref={ref} style={{ width: "100%", height: 300 }} />;
+  // Heatmaps grow with their row count so cells stay readable.
+  let height = 300;
+  if (event.spec.chart.type === "heatmap") {
+    const s = event.result.metadata.binding.series;
+    const rows = s ? new Set(event.result.rows.map((r) => String(r[s]))).size : 0;
+    height = Math.min(560, Math.max(240, 120 + rows * 30));
+  }
+
+  return <div ref={ref} style={{ width: "100%", height }} />;
 }
+
+// Warm sequential ramp for heatmap cells: paper → vermilion → deep brick.
+const HEAT_RAMP = ["#fdf2ee", "#f6c9ba", "#eb9a80", "#d23b1e", "#7e2312"];
 
 function buildOption(event: ChartEvent): echarts.EChartsOption {
   const { spec, result } = event;
@@ -127,9 +143,9 @@ function buildOption(event: ChartEvent): echarts.EChartsOption {
     tooltip: {
       trigger: kind === "pie" ? "item" : "axis",
       backgroundColor: SURFACE,
-      borderColor: "#3d3d45",
+      borderColor: "#d8d6cd",
       borderWidth: 1,
-      extraCssText: "box-shadow: 0 2px 10px rgba(0,0,0,0.4); border-radius: 4px;",
+      extraCssText: "box-shadow: 0 2px 10px rgba(27,27,31,0.12);",
       textStyle: { color: INK, fontSize: 12, fontFamily: "Fragment Mono, monospace" },
     },
     grid: { left: 8, right: 16, top: 26, bottom: 8, containLabel: true },
@@ -153,9 +169,127 @@ function buildOption(event: ChartEvent): echarts.EChartsOption {
     };
   }
 
-  // bar | line | area — categorical/temporal x, one or more numeric series.
+  if (kind === "heatmap") {
+    // Grid: x = column axis, series = row axis, y[0] = cell value.
+    const x = binding.x as string;
+    const s = binding.series as string;
+    const v = binding.y[0];
+    const xCats = [...new Set(rows.map((r) => String(r[x])))];
+    const yCats = [...new Set(rows.map((r) => String(r[s])))];
+    const data = rows.map((r) => [
+      xCats.indexOf(String(r[x])),
+      yCats.indexOf(String(r[s])),
+      Number(r[v]),
+    ]);
+    const values = data.map((d) => d[2] as number).filter(Number.isFinite);
+    const max = values.length ? Math.max(...values) : 1;
+    const min = values.length ? Math.min(...values, 0) : 0;
+    return {
+      ...base,
+      grid: { left: 8, right: 16, top: 10, bottom: 56, containLabel: true },
+      xAxis: {
+        type: "category",
+        data: xCats,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { color: AXIS_COLOR, fontSize: 10.5, hideOverlap: true },
+        splitArea: { show: false },
+      },
+      yAxis: {
+        type: "category",
+        data: yCats,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { color: AXIS_COLOR, fontSize: 10.5 },
+      },
+      visualMap: {
+        min,
+        max,
+        calculable: false,
+        orient: "horizontal",
+        left: "center",
+        bottom: 0,
+        inRange: { color: HEAT_RAMP },
+        textStyle: { color: AXIS_COLOR, fontSize: 10 },
+        itemHeight: 90,
+      },
+      series: [
+        {
+          type: "heatmap",
+          data,
+          label:
+            xCats.length * yCats.length <= 220
+              ? {
+                  show: true,
+                  fontSize: 9.5,
+                  fontFamily: "Fragment Mono, monospace",
+                  color: INK,
+                  formatter: (p: { value?: unknown }) => {
+                    const v = Array.isArray(p.value) ? Number(p.value[2]) : NaN;
+                    if (!Number.isFinite(v)) return "";
+                    return Math.abs(v) >= 10000 ? nfCompact.format(v) : nf.format(v);
+                  },
+                }
+              : { show: false },
+          itemStyle: { borderColor: "#fff", borderWidth: 1.5 },
+          emphasis: { itemStyle: { borderColor: INK, borderWidth: 1 } },
+        },
+      ],
+    };
+  }
+
+  if (kind === "scatter") {
+    // Numeric x vs numeric y; series (optional) colors point groups.
+    const x = binding.x as string;
+    const y = binding.y[0];
+    const valueAxis = (name: string): echarts.XAXisComponentOption & echarts.YAXisComponentOption => ({
+      type: "value",
+      name,
+      nameTextStyle: { color: AXIS_COLOR, fontSize: 10 },
+      axisLine: { show: false },
+      splitLine: { lineStyle: { color: SPLIT_COLOR } },
+      axisLabel: {
+        color: AXIS_COLOR,
+        fontSize: 10.5,
+        formatter: (v: number) => (Math.abs(v) >= 10000 ? nfCompact.format(v) : nf.format(v)),
+      },
+    });
+    const groups = binding.series
+      ? [...new Set(rows.map((r) => String(r[binding.series as string])))]
+      : [null];
+    const series = groups.map((g) => ({
+      name: g ?? y,
+      type: "scatter" as const,
+      symbolSize: 9,
+      itemStyle: { opacity: 0.75 },
+      data: rows
+        .filter((r) => (g === null ? true : String(r[binding.series as string]) === g))
+        .map((r) => [Number(r[x]), Number(r[y])]),
+    }));
+    return {
+      ...base,
+      legend:
+        groups.length > 1 && groups[0] !== null
+          ? { top: 0, textStyle: { color: INK, fontSize: 11 }, icon: "circle", itemWidth: 8 }
+          : { show: false },
+      grid: { left: 8, right: 20, top: 30, bottom: 8, containLabel: true },
+      xAxis: valueAxis(x),
+      yAxis: valueAxis(y),
+      series,
+    };
+  }
+
+  // bar | line | area | combo — categorical/temporal x; y[] on the left
+  // axis, y2[] on a right axis (combo: y bars + y2 lines).
   const x = binding.x as string;
   const categories = [...new Set(rows.map((r) => String(r[x])))];
+  const leftType = kind === "combo" ? "bar" : kind === "bar" ? "bar" : "line";
+
+  const valueFor = (y: string) =>
+    categories.map((cat) => {
+      const row = rows.find((r) => String(r[x]) === cat);
+      return row ? Number(row[y]) : null;
+    });
 
   let series: echarts.SeriesOption[];
   if (binding.series) {
@@ -165,9 +299,9 @@ function buildOption(event: ChartEvent): echarts.EChartsOption {
     const names = [...new Set(rows.map((r) => String(r[s])))];
     series = names.map((name) => ({
       name,
-      type: kind === "bar" ? "bar" : "line",
+      type: leftType,
       areaStyle: kind === "area" ? { opacity: 0.18 } : undefined,
-      smooth: kind !== "bar" ? 0.15 : undefined,
+      smooth: leftType !== "bar" ? 0.15 : undefined,
       showSymbol: false,
       data: categories.map((cat) => {
         const row = rows.find((r) => String(r[x]) === cat && String(r[s]) === name);
@@ -175,19 +309,37 @@ function buildOption(event: ChartEvent): echarts.EChartsOption {
       }),
     }));
   } else {
-    series = binding.y.map((y) => ({
-      name: y,
-      type: kind === "bar" ? "bar" : "line",
-      areaStyle: kind === "area" ? { opacity: 0.18 } : undefined,
-      smooth: kind !== "bar" ? 0.15 : undefined,
-      showSymbol: false,
-      barMaxWidth: 34,
-      data: categories.map((cat) => {
-        const row = rows.find((r) => String(r[x]) === cat);
-        return row ? Number(row[y]) : null;
-      }),
-    }));
+    series = [
+      ...binding.y.map((y) => ({
+        name: y,
+        type: leftType,
+        yAxisIndex: 0,
+        areaStyle: kind === "area" ? { opacity: 0.18 } : undefined,
+        smooth: leftType !== "bar" ? 0.15 : undefined,
+        showSymbol: false,
+        barMaxWidth: 34,
+        data: valueFor(y),
+      })),
+      // Right axis overlays always render as lines: the second scale reads
+      // as a trace over the primary shape.
+      ...binding.y2.map((y) => ({
+        name: y,
+        type: "line" as const,
+        yAxisIndex: 1,
+        smooth: 0.15,
+        showSymbol: false,
+        lineStyle: { width: 2.5 },
+        data: valueFor(y),
+      })),
+    ] as echarts.SeriesOption[];
   }
+
+  const hasRightAxis = !binding.series && binding.y2.length > 0;
+  const axisLabelFmt = {
+    color: AXIS_COLOR,
+    fontSize: 10.5,
+    formatter: (v: number) => (Math.abs(v) >= 10000 ? nfCompact.format(v) : nf.format(v)),
+  };
 
   return {
     ...base,
@@ -202,15 +354,16 @@ function buildOption(event: ChartEvent): echarts.EChartsOption {
       axisLabel: { color: AXIS_COLOR, fontSize: 10.5, hideOverlap: true },
       axisTick: { show: false },
     },
-    yAxis: {
-      type: "value",
-      splitLine: { lineStyle: { color: SPLIT_COLOR } },
-      axisLabel: {
-        color: AXIS_COLOR,
-        fontSize: 10.5,
-        formatter: (v: number) => (Math.abs(v) >= 10000 ? nfCompact.format(v) : nf.format(v)),
-      },
-    },
+    yAxis: hasRightAxis
+      ? [
+          { type: "value", splitLine: { lineStyle: { color: SPLIT_COLOR } }, axisLabel: axisLabelFmt },
+          { type: "value", splitLine: { show: false }, axisLabel: axisLabelFmt },
+        ]
+      : {
+          type: "value",
+          splitLine: { lineStyle: { color: SPLIT_COLOR } },
+          axisLabel: axisLabelFmt,
+        },
     series,
   };
 }

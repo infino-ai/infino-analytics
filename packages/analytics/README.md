@@ -170,13 +170,16 @@ status → progress → step → step_done → … → sql → chart → summary
 A `chart` event carries everything a renderer needs:
 
 - `spec` (`VizSpec`): the saved-object shape. `chart.type` is one of
-  `bar | line | area | pie | metric | table`; `title`, `source.raw_query`,
-  and axis `mapping` describe intent.
+  `bar | line | area | pie | metric | table | heatmap | scatter | combo`;
+  `title`, `source.raw_query`, and axis `mapping` describe intent
+  (`mapping.y2` puts columns on a secondary right axis; for heatmap, `x` is
+  the column axis, `series` the row axis, `y[0]` the cell value).
 - `result` (`ExecuteResult`): `columns`, `rows`, and `metadata` including
   `row_count`, `took_ms`, `warnings`, and `binding`.
 
 The one rule: **read column names only from `result.metadata.binding`**
-(`x`, `y[]`, `series`, `value`), never from the spec or by parsing the SQL.
+(`x`, `y[]`, `y2[]`, `series`, `value`), never from the spec or by parsing
+the SQL.
 The binding is resolved server-side against the actual result columns, which
 matters because engines rename aliases. `metadata.warnings` lists anything
 the executor degraded rather than failed on (e.g. a high-cardinality x axis);

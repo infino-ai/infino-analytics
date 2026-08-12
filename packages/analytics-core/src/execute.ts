@@ -85,7 +85,7 @@ function resolveBinding(
   rows: Record<string, unknown>[],
   warnings: Warning[],
 ): Binding {
-  const binding: Binding = { x: null, y: [], series: null, value: null };
+  const binding: Binding = { x: null, y: [], y2: [], series: null, value: null };
   const chartType = spec.chart.type;
 
   if (rows.length === 0) {
@@ -108,7 +108,7 @@ function resolveBinding(
     return binding;
   }
 
-  // bar | line | area | pie
+  // bar | line | area | pie | heatmap | scatter | combo
   binding.x = resolveColumn(spec.mapping.x, columns);
   if (!binding.x) {
     warnings.push({
@@ -144,11 +144,53 @@ function resolveBinding(
     }
   }
 
+  // Secondary axis: resolved like y, but never inferred — a right axis is
+  // always an explicit choice.
+  for (const y2 of spec.mapping.y2) {
+    const resolved = resolveColumn(y2, columns);
+    if (!resolved) {
+      warnings.push({ code: "y2_column_not_found", message: `mapping.y2 column ${JSON.stringify(y2)} not in result` });
+      continue;
+    }
+    if (!numericCols.includes(resolved)) {
+      warnings.push({ code: "y2_column_not_numeric", message: `mapping.y2 column ${JSON.stringify(resolved)} is not numeric` });
+      continue;
+    }
+    binding.y2.push(resolved);
+  }
+
   if (spec.mapping.series && chartType !== "pie") {
     binding.series = resolveColumn(spec.mapping.series, columns);
     if (!binding.series) {
       warnings.push({ code: "series_column_not_found", message: `mapping.series ${JSON.stringify(spec.mapping.series)} not in result` });
     }
+  }
+
+  // Per-type shape checks, still degrade-never-fail.
+  if (chartType === "heatmap" && !binding.series) {
+    warnings.push({
+      code: "heatmap_needs_series",
+      message: "heatmap needs mapping.series as the row axis (x = columns, y = cell value); rendering falls back to a table without it",
+    });
+  }
+  if (chartType === "scatter" && binding.x && !numericCols.includes(binding.x)) {
+    warnings.push({
+      code: "scatter_x_not_numeric",
+      message: `scatter expects a numeric x; ${JSON.stringify(binding.x)} is not numeric`,
+    });
+  }
+  if (binding.series && binding.y2.length > 0) {
+    warnings.push({
+      code: "y2_ignored_with_series",
+      message: "mapping.series pivots rows into series, so mapping.y2 is ignored; use explicit y/y2 columns instead",
+    });
+    binding.y2 = [];
+  }
+  if (chartType === "combo" && binding.y2.length === 0) {
+    warnings.push({
+      code: "combo_needs_y2",
+      message: "combo overlays y2 lines on y bars; without mapping.y2 it renders as plain bars",
+    });
   }
 
   if (binding.x && (chartType === "bar" || chartType === "pie")) {

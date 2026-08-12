@@ -18,12 +18,18 @@ const MODEL_SAMPLE_ROWS = 5;
 
 const CreateChartInput = {
   title: z.string().describe("Short human title for the chart"),
-  chart_type: z.enum(CHART_TYPES).describe("bar | line | area | pie | metric | table"),
+  chart_type: z
+    .enum(CHART_TYPES)
+    .describe("bar | line | area | pie | metric | table | heatmap | scatter | combo"),
   table: z.string().describe("Source table name"),
   sql: z.string().describe("The SELECT that produces the chart's data. Alias every aggregate."),
-  x: z.string().optional().describe("Result column for the x axis / category"),
-  y: z.array(z.string()).optional().describe("Numeric result column(s) for the y axis / value"),
-  series: z.string().optional().describe("Result column that splits into one series per value"),
+  x: z.string().optional().describe("Result column for the x axis / category (heatmap: column axis; scatter: numeric)"),
+  y: z.array(z.string()).optional().describe("Numeric result column(s) for the y axis / value (heatmap: the cell value)"),
+  y2: z
+    .array(z.string())
+    .optional()
+    .describe("Numeric column(s) on a secondary RIGHT axis (different unit/scale); combo renders them as lines over the y bars"),
+  series: z.string().optional().describe("Result column that splits into one series per value (heatmap: the row axis)"),
   time_column: z.string().optional().describe("ISO timestamp column of the source table, if any"),
 };
 
@@ -33,7 +39,7 @@ const CreateChartInput = {
 export function buildLocalTools(client: InfinoClient, emit: (e: ChatEvent) => void) {
   const createChart = tool(
     "create_chart",
-    "Execute a SQL query and render the result to the user as a chart or table — the ONLY way to show data to the user. Chart intuition: single number → metric; time on x → line/area; categories → bar (bounded with a top-N LIMIT so it stays readable); proportions under ~8 slices → pie; raw records → table. The x/y/series mapping must use the EXACT column aliases from the SELECT (alias every aggregate, e.g. COUNT(*) AS n) — the renderer binds by result-column name. Returns the resolved binding, row count, warnings, and a small sample; warnings mean adjust the SQL or mapping and call again.",
+    "Execute a SQL query and render the result to the user as a chart or table — the ONLY way to show data to the user. Chart intuition: single number → metric; time on x → line/area; categories → bar (bounded with a top-N LIMIT so it stays readable); proportions under ~8 slices → pie; raw records → table; two categorical dimensions + one measure (hour × weekday, feature × bucket) → heatmap with x = column axis, series = row axis, y = the cell value (SQL returns one row per cell); relationship between two numeric measures → scatter with numeric x and y, optional series to color point groups; a measure and a rate/price on different scales → combo (or line/bar) with y on the left axis and y2 on the right — y2 renders as lines over combo's y bars. The x/y/y2/series mapping must use the EXACT column aliases from the SELECT (alias every aggregate, e.g. COUNT(*) AS n) — the renderer binds by result-column name. Returns the resolved binding, row count, warnings, and a small sample; warnings mean adjust the SQL or mapping and call again.",
     CreateChartInput,
     async (args) => {
       const parsed = VizSpecSchema.safeParse({
@@ -45,7 +51,7 @@ export function buildLocalTools(client: InfinoClient, emit: (e: ChatEvent) => vo
           time_column: args.time_column,
         },
         chart: { type: args.chart_type },
-        mapping: { x: args.x, y: args.y ?? [], series: args.series },
+        mapping: { x: args.x, y: args.y ?? [], y2: args.y2 ?? [], series: args.series },
       } satisfies Record<string, unknown>);
       if (!parsed.success) {
         return errorResult(`invalid chart spec: ${parsed.error.message.slice(0, 400)}`);
