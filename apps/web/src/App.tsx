@@ -425,7 +425,7 @@ export default function App() {
                       figNo += 1;
                       return (
                         <div key={`fig${figNo}`}>
-                          <ChartCard event={chart} figNo={figNo} />
+                          <ChartCard event={chart} />
                           {sql && (
                             <figure className="sqlblock">
                               <figcaption>
@@ -452,6 +452,10 @@ export default function App() {
                         <Md text={answerText} />
                         <CopyButton text={answerText} />
                       </div>
+                    )}
+
+                    {!turn.running && turn.elapsed !== undefined && (
+                      <div className="turn-time">{turn.elapsed.toFixed(1)}s</div>
                     )}
                   </div>
                 </div>

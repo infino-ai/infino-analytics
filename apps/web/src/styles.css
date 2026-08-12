@@ -217,6 +217,15 @@ body {
 }
 /* the last turn's separator would double up against the composer's top rule */
 .turn:last-child { border-bottom: none; }
+
+/* total turn duration, quiet, at the very end of the response */
+.turn-time {
+  margin-top: 14px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+}
 @keyframes settle { from { opacity: 0; transform: translateY(4px); } }
 
 .user-row {

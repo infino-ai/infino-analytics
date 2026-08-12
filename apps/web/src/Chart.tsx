@@ -19,9 +19,8 @@ const MAX_TABLE_ROWS = 50;
 const nf = new Intl.NumberFormat("en-US");
 const nfCompact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
 
-const pad2 = (n: number) => String(n).padStart(2, "0");
 
-export function ChartCard({ event, figNo }: { event: ChartEvent; figNo: number }) {
+export function ChartCard({ event }: { event: ChartEvent }) {
   const { spec, result } = event;
   const kind = spec.chart.type;
   const warnings = result.metadata.warnings;
@@ -29,7 +28,6 @@ export function ChartCard({ event, figNo }: { event: ChartEvent; figNo: number }
   return (
     <div className="card">
       <div className="card-head">
-        <span className="card-figno">FIG. {pad2(figNo)}</span>
         <span className="card-title">{spec.title}</span>
         <span className="card-kind">{kind}</span>
       </div>
@@ -42,11 +40,11 @@ export function ChartCard({ event, figNo }: { event: ChartEvent; figNo: number }
           <Echart event={event} />
         )}
       </div>
-      <div className="card-foot">
-        <span>{nf.format(result.metadata.row_count)} rows</span>
-        <span>{result.metadata.took_ms} ms</span>
-        {warnings.length > 0 && <span className="warn">⚠ {warnings.map((w) => w.code).join(", ")}</span>}
-      </div>
+      {warnings.length > 0 && (
+        <div className="card-foot">
+          <span className="warn">⚠ {warnings.map((w) => w.code).join(", ")}</span>
+        </div>
+      )}
     </div>
   );
 }
