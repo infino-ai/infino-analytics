@@ -19,7 +19,14 @@ const nf = new Intl.NumberFormat("en-US");
 const nfCompact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
 
 
-export function ChartCard({ event }: { event: ChartEvent }) {
+export function ChartCard({
+  event,
+  actions,
+}: {
+  event: ChartEvent;
+  /** Extra controls for the card head (pin, delete, …) — page-specific. */
+  actions?: React.ReactNode;
+}) {
   const { spec, result } = event;
   const kind = spec.chart.type;
   const { warnings, binding } = result.metadata;
@@ -35,6 +42,7 @@ export function ChartCard({ event }: { event: ChartEvent }) {
       <div className="card-head">
         <span className="card-title">{spec.title}</span>
         <span className="card-kind">{kind}</span>
+        {actions}
       </div>
       <div className="card-body">
         {kind === "metric" ? (

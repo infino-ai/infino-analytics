@@ -180,6 +180,37 @@ body {
   letter-spacing: 0.02em;
 }
 
+.nav {
+  display: flex;
+  gap: 4px;
+  margin-left: 26px;
+  align-self: center;
+}
+.navlink {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-dim);
+  text-decoration: none;
+  padding: 4px 11px;
+  border-radius: 999px;
+}
+.navlink:hover { color: var(--ink); }
+.navlink.active {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* chat stays mounted behind the other pages */
+.pagekeep { display: none; }
+.pagekeep.show {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.pagekeep.show > .body { flex: 1; min-height: 0; }
+
 .header .status {
   margin-left: auto;
   font-family: var(--mono);
@@ -691,4 +722,137 @@ table.data tr:hover td { background: var(--accent-soft); }
   font-family: var(--mono);
   font-size: 12px;
   color: var(--ink-dim);
+}
+
+
+/* ── visualization library + dashboards ─────────────────── */
+
+.page {
+  flex: 1;
+  overflow-y: auto;
+  padding: 26px 36px 40px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule) transparent;
+}
+.pagenote {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-faint);
+  padding: 14px 0;
+}
+.pagenote a { color: var(--cobalt); }
+
+.vizgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(430px, 1fr));
+  gap: 22px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.vizcell .card { margin: 0; }
+
+/* actions living in a card head (pin, delete, +dashboard) */
+.cardaction {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  margin-left: 8px;
+}
+.card-head .cardaction:first-of-type { margin-left: auto; }
+.card-head .card-kind + .cardaction { margin-left: 12px; }
+.card-head .card-kind { margin-left: auto; }
+.cardaction:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
+.cardaction:disabled { cursor: default; color: var(--green); border-color: var(--rule); }
+
+/* dashboards list */
+.dashlist {
+  max-width: 880px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dashitem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid var(--rule-dark);
+  border-radius: 8px;
+  padding: 14px 18px;
+}
+.dashopen {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  text-decoration: none;
+  color: var(--ink);
+  min-width: 0;
+}
+.dashtitle { font-weight: 600; font-size: 15px; }
+.dashmeta {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+}
+
+/* a rendered dashboard: the 48-column grid, width-faithful */
+.dashhead {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  max-width: 1400px;
+  margin: 0 auto 18px;
+}
+.dashback {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+  text-decoration: none;
+}
+.dashback:hover { color: var(--accent); }
+.dashname { font-size: 20px; font-weight: 700; margin: 0; }
+
+.dashgrid {
+  display: grid;
+  grid-template-columns: repeat(48, 1fr);
+  gap: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.panel { min-width: 0; }
+.panel .card { margin: 0; height: 100%; }
+.panel-md {
+  background: #fff;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 14px 18px;
+}
+.panel-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.panel-divider::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--rule);
+}
+
+@media (max-width: 1100px) {
+  .dashgrid .panel { grid-column: span 48 !important; }
 }

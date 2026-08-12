@@ -4,10 +4,102 @@
 // run `Analytics` itself (it holds API keys and spawns the agent), but it compiles
 // against the same event vocabulary the facade yields. `import type` is
 // erased at build time, so no server code reaches the bundle.
-import type { ChatEvent, Thread, StoredMessage } from "@infino-ai/analytics";
+import type {
+  ChatEvent,
+  Dashboard,
+  ExecuteResult,
+  NewVisualization,
+  Thread,
+  StoredMessage,
+  Visualization,
+} from "@infino-ai/analytics";
 
-export type { ChatEvent, Thread, StoredMessage };
+export type {
+  ChatEvent,
+  Thread,
+  StoredMessage,
+  Visualization,
+  Dashboard,
+  ExecuteResult,
+  NewVisualization,
+};
 export type ChartEvent = Extract<ChatEvent, { type: "chart" }>;
+
+// ── the persistence surface (visualizations + dashboards) ─────────────────
+
+interface Envelope<T> {
+  id: string;
+  attributes: T;
+}
+
+async function json<T>(res: Response): Promise<T> {
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error ?? `request failed (${res.status})`);
+  }
+  return (await res.json()) as T;
+}
+
+export async function listVisualizations(): Promise<Visualization[]> {
+  const body = await json<{ items: Envelope<Visualization>[] }>(await fetch("/visualizations"));
+  return body.items.map((e) => e.attributes);
+}
+
+export async function createVisualization(input: NewVisualization): Promise<Visualization> {
+  const res = await fetch("/visualizations", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return (await json<Envelope<Visualization>>(res)).attributes;
+}
+
+export async function deleteVisualization(id: string): Promise<void> {
+  await fetch(`/visualizations/${id}`, { method: "DELETE" });
+}
+
+export async function executeVisualization(
+  id: string,
+  body: { filters?: unknown; time_range?: unknown } = {},
+): Promise<ExecuteResult> {
+  const res = await fetch(`/visualizations/${id}/data`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return json<ExecuteResult>(res);
+}
+
+export async function listDashboards(): Promise<Dashboard[]> {
+  const body = await json<{ items: Envelope<Dashboard>[] }>(await fetch("/dashboards"));
+  return body.items.map((e) => e.attributes);
+}
+
+export async function getDashboard(id: string): Promise<Dashboard> {
+  return (await json<Envelope<Dashboard>>(await fetch(`/dashboards/${id}`))).attributes;
+}
+
+export async function createDashboard(input: { title: string }): Promise<Dashboard> {
+  const res = await fetch("/dashboards", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return (await json<Envelope<Dashboard>>(res)).attributes;
+}
+
+export async function patchDashboard(id: string, patch: unknown): Promise<Dashboard> {
+  const res = await fetch(`/dashboards/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  return (await json<Envelope<Dashboard>>(res)).attributes;
+}
+
+export async function deleteDashboard(id: string): Promise<void> {
+  await fetch(`/dashboards/${id}`, { method: "DELETE" });
+}
 
 export async function createThread(): Promise<Thread> {
   const res = await fetch("/api/threads", { method: "POST" });
