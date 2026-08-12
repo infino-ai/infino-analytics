@@ -386,7 +386,7 @@ export default function App() {
                             </span>
                           )}
                         </button>
-                        {open && (
+                        <div className="activity-wrap">
                           <div className="activity-body">
                             {logItems.map(({ e, k }) =>
                               e.type === "step" ? (
@@ -417,7 +417,7 @@ export default function App() {
                               </div>
                             )}
                           </div>
-                        )}
+                        </div>
                       </div>
                     )}
 

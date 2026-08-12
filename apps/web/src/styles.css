@@ -271,7 +271,21 @@ body {
 .spin { animation: spin 0.7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.activity-body { padding: 8px 0 4px 12px; }
+/* Expand/collapse animates: the wrap's grid row eases between 0fr and 1fr
+   (height-auto animation without measuring), padding eases in with it. */
+.activity-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.28s ease;
+}
+.activity.open .activity-wrap { grid-template-rows: 1fr; }
+.activity-body {
+  overflow: hidden;
+  min-height: 0;
+  padding: 0 0 0 12px;
+  transition: padding 0.28s ease;
+}
+.activity.open .activity-body { padding: 8px 0 4px 12px; }
 .narration {
   color: var(--ink-dim);
   font-size: 13.5px;
@@ -309,6 +323,7 @@ body {
 /* SQL as a visible code snippet: caption + fenced block */
 .sqlblock {
   margin: 14px 0;
+  animation: settle 0.35s ease-out;
 }
 .sqlblock figcaption {
   display: flex;
@@ -338,10 +353,9 @@ body {
 }
 
 .answer {
-  position: relative;
   margin: 16px 0 0;
-  max-width: 72ch;
   font-size: 15px;
+  animation: settle 0.35s ease-out;
 }
 /* copy affordance: quiet until you hover the block it belongs to */
 .copy {
@@ -358,10 +372,10 @@ body {
   opacity: 0;
   transition: opacity 0.15s, color 0.15s, border-color 0.15s;
 }
+/* below the answer, never over it */
 .answer .copy {
-  position: absolute;
-  top: 0;
-  right: 0;
+  display: block;
+  margin-top: 10px;
 }
 .answer:hover .copy,
 .sqlblock:hover .copy { opacity: 1; }
@@ -459,6 +473,7 @@ body {
 
 .card {
   margin: 20px 0 8px;
+  animation: settle 0.35s ease-out;
   border: 1px solid var(--rule-dark);
   border-radius: 6px;
   background: var(--paper-raise);
