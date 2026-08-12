@@ -41,8 +41,8 @@ async function json<T>(res: Response): Promise<T> {
 }
 
 export async function listVisualizations(): Promise<Visualization[]> {
-  const body = await json<{ items: Envelope<Visualization>[] }>(await fetch("/visualizations"));
-  return body.items.map((e) => e.attributes);
+  const body = await json<{ items?: Envelope<Visualization>[] }>(await fetch("/visualizations"));
+  return (body.items ?? []).map((e) => e.attributes);
 }
 
 export async function createVisualization(input: NewVisualization): Promise<Visualization> {
@@ -71,8 +71,8 @@ export async function executeVisualization(
 }
 
 export async function listDashboards(): Promise<Dashboard[]> {
-  const body = await json<{ items: Envelope<Dashboard>[] }>(await fetch("/dashboards"));
-  return body.items.map((e) => e.attributes);
+  const body = await json<{ items?: Envelope<Dashboard>[] }>(await fetch("/dashboards"));
+  return (body.items ?? []).map((e) => e.attributes);
 }
 
 export async function getDashboard(id: string): Promise<Dashboard> {
@@ -102,23 +102,21 @@ export async function deleteDashboard(id: string): Promise<void> {
 }
 
 export async function createThread(): Promise<Thread> {
-  const res = await fetch("/api/threads", { method: "POST" });
-  const body = (await res.json()) as { thread: Thread };
+  const body = await json<{ thread: Thread }>(await fetch("/api/threads", { method: "POST" }));
   return body.thread;
 }
 
 export async function listThreads(): Promise<Thread[]> {
-  const res = await fetch("/api/threads");
-  const body = (await res.json()) as { threads: Thread[] };
-  return body.threads;
+  const body = await json<{ threads?: Thread[] }>(await fetch("/api/threads"));
+  return body.threads ?? [];
 }
 
 export async function getThreadMessages(
   threadId: string,
 ): Promise<{ thread: Thread; messages: StoredMessage[] }> {
-  const res = await fetch(`/api/threads/${threadId}/messages`);
-  if (!res.ok) throw new Error(`thread fetch failed (${res.status})`);
-  return (await res.json()) as { thread: Thread; messages: StoredMessage[] };
+  return json<{ thread: Thread; messages: StoredMessage[] }>(
+    await fetch(`/api/threads/${threadId}/messages`),
+  );
 }
 
 export async function deleteThread(threadId: string): Promise<void> {

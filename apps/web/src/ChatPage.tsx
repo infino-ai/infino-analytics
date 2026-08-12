@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import {
   chat,
+  createDashboard,
   createThread,
   createVisualization,
   deleteThread,
   getThreadMessages,
+  listDashboards,
   listThreads,
+  patchDashboard,
   type ChatEvent,
+  type Dashboard,
   type StoredMessage,
   type Thread,
 } from "./api";
@@ -40,27 +44,116 @@ function SqlReveal({ sql }: { sql: string }) {
   );
 }
 
-// Pin a chart from the conversation into the visualization library: the
-// chart event's spec IS the persistence shape, so this is one POST.
-function PinButton({ spec }: { spec: Extract<ChatEvent, { type: "chart" }>["spec"] }) {
-  const [state, setState] = useState<"idle" | "saving" | "pinned">("idle");
+// Add a chart from the conversation straight onto a dashboard: pick an
+// existing one from the menu or create a new one inline. Under the hood the
+// chart's spec is saved as a visualization (it IS the persistence shape)
+// and a panel referencing it is appended, auto-flowed two-up on the
+// 48-column grid.
+function AddToDashboard({ spec }: { spec: Extract<ChatEvent, { type: "chart" }>["spec"] }) {
+  const [open, setOpen] = useState(false);
+  const [dashboards, setDashboards] = useState<Dashboard[] | null>(null);
+  const [naming, setNaming] = useState(false);
+  const [title, setTitle] = useState("");
+  const [state, setState] = useState<"idle" | "busy" | "done">("idle");
+  const [addedTo, setAddedTo] = useState("");
+
+  function toggle() {
+    if (state === "busy") return;
+    setOpen(!open);
+    if (!open) {
+      setDashboards(null);
+      setNaming(false);
+      listDashboards().then(setDashboards).catch(() => setDashboards([]));
+    }
+  }
+
+  async function addTo(dash: Dashboard) {
+    setState("busy");
+    try {
+      const viz = await createVisualization({ ...spec });
+      const n = dash.panels.length;
+      await patchDashboard(dash.id, {
+        panels: [
+          ...dash.panels,
+          {
+            kind: "visualization" as const,
+            viz_id: viz.id,
+            layout: { x: (n % 2) * 24, y: Math.floor(n / 2) * 18, w: 24, h: 18 },
+          },
+        ],
+      });
+      setAddedTo(dash.title);
+      setState("done");
+      setOpen(false);
+    } catch {
+      setState("idle");
+    }
+  }
+
+  async function createAndAdd() {
+    if (!title.trim()) return;
+    setState("busy");
+    try {
+      await addTo(await createDashboard({ title: title.trim() }));
+    } catch {
+      setState("idle");
+    }
+  }
+
+  if (state === "done") {
+    return (
+      <span className="cardaction added" title={`Added to "${addedTo}"`}>
+        ✓ {addedTo}
+      </span>
+    );
+  }
+
   return (
-    <button
-      className="cardaction"
-      disabled={state !== "idle"}
-      title="Save to the visualization library"
-      onClick={async () => {
-        setState("saving");
-        try {
-          await createVisualization({ ...spec });
-          setState("pinned");
-        } catch {
-          setState("idle");
-        }
-      }}
-    >
-      {state === "pinned" ? "pinned ✓" : state === "saving" ? "…" : "pin"}
-    </button>
+    <span className="dashmenu-wrap">
+      <button className="cardaction" onClick={toggle} disabled={state === "busy"}>
+        {state === "busy" ? "adding…" : "+ dashboard"}
+      </button>
+      {open && (
+        <>
+          <button className="dashmenu-backdrop" onClick={() => setOpen(false)} aria-label="close" />
+          <div className="dashmenu">
+            {dashboards === null && <div className="dashmenu-note">loading…</div>}
+            {dashboards?.map((d) => (
+              <button className="dashmenu-item" key={d.id} onClick={() => addTo(d)}>
+                <span className="dashmenu-title">{d.title}</span>
+                <span className="dashmenu-meta">
+                  {d.panels.length} panel{d.panels.length === 1 ? "" : "s"}
+                </span>
+              </button>
+            ))}
+            {dashboards?.length === 0 && <div className="dashmenu-note">no dashboards yet</div>}
+            {naming ? (
+              <form
+                className="dashmenu-newform"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void createAndAdd();
+                }}
+              >
+                <input
+                  autoFocus
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="dashboard title"
+                />
+                <button type="submit" disabled={!title.trim()}>
+                  create
+                </button>
+              </form>
+            ) : (
+              <button className="dashmenu-item dashmenu-newbtn" onClick={() => setNaming(true)}>
+                + new dashboard…
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </span>
   );
 }
 
@@ -194,7 +287,7 @@ function TurnBody({ turn }: { turn: Turn }) {
       case "chart":
         blocks.push(
           <div key={k}>
-            <ChartCard event={e} actions={<PinButton spec={e.spec} />} />
+            <ChartCard event={e} actions={<AddToDashboard spec={e.spec} />} />
             {pendingSql && <SqlReveal sql={pendingSql} />}
           </div>,
         );

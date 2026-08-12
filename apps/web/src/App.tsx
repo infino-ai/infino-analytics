@@ -1,13 +1,11 @@
 import { useEffect, useState } from "react";
 import ChatPage from "./ChatPage";
 import DashboardsPage from "./DashboardsPage";
-import VizPage from "./VizPage";
 import { FinoMark } from "./icons";
 
 // The app shell: header with the surface nav, and a tiny hash router — no
 // routing dependency, nothing for a fork to untangle. Routes:
 //   #/chat                 the conversational surface (default)
-//   #/visualizations       the saved-chart library
 //   #/dashboards[/:id]     dashboards list / a rendered dashboard
 function useRoute(): string {
   const [hash, setHash] = useState(window.location.hash);
@@ -21,7 +19,6 @@ function useRoute(): string {
 
 const NAV = [
   { path: "/chat", label: "chat" },
-  { path: "/visualizations", label: "visualizations" },
   { path: "/dashboards", label: "dashboards" },
 ];
 
@@ -52,7 +49,6 @@ export default function App() {
       <div className={section === "/chat" ? "pagekeep show" : "pagekeep"}>
         <ChatPage />
       </div>
-      {section === "/visualizations" && <VizPage />}
       {section === "/dashboards" && <DashboardsPage dashId={dashId} />}
     </div>
   );

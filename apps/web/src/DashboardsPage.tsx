@@ -10,6 +10,7 @@ import {
   type Visualization,
 } from "./api";
 import { ChartCard } from "./Chart";
+import { Spinner } from "./icons";
 import { Md } from "./ui";
 
 // Dashboards, rendered per the contract: the client fans out one execute
@@ -159,7 +160,20 @@ function DashboardView({ id }: { id: string }) {
               ) : res && "error" in res ? (
                 <div className="error">{res.error}</div>
               ) : (
-                <div className="pagenote">executing…</div>
+                // Skeleton while the panel's execute is in flight: the card
+                // frame with its title, a spinner where the figure will be.
+                <div className="card">
+                  <div className="card-head">
+                    <span className="card-title">
+                      {panel.title_override ?? viz?.title ?? "…"}
+                    </span>
+                    {viz && <span className="card-kind">{viz.chart.type}</span>}
+                  </div>
+                  <div className="card-body panel-loader">
+                    <Spinner className="working-spin" />
+                    resolving panel…
+                  </div>
+                </div>
               )}
             </div>
           );
