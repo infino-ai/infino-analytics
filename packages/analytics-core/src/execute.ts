@@ -1,5 +1,7 @@
 import type { Binding, ExecuteResult, VizSpec, Warning } from "./spec.js";
 import type { InfinoClient } from "./client.js";
+import { injectFilters, mergeFilters, timeRangeFilter } from "./filters.js";
+import type { Filter, TimeRange } from "./viz.js";
 
 // Cap what execute returns; charts never need more, and the stream carries
 // these rows to the client verbatim.
@@ -8,13 +10,35 @@ const MAX_ROWS = 5000;
 // warning tells the agent to rewrite the SQL with a top-N instead.
 const HIGH_CARDINALITY_X = 60;
 
-/** Execute a VizSpec: run its SQL, resolve the axis→column binding against
- * the ACTUAL result columns, and validate the shape. Degrade-never-fail:
- * problems become machine-readable warnings and the data still returns, so
- * both renderers and the agent can react. */
-export async function execute(client: InfinoClient, spec: VizSpec): Promise<ExecuteResult> {
+export interface ExecuteOptions {
+  /** Saved filters (from the visualization document). */
+  savedFilters?: Filter[];
+  /** Runtime filters; win over saved filters on field collision. */
+  filters?: Filter[];
+  /** Absolute window applied as a synthetic between-filter on the spec's
+   * time column (default "@timestamp"). */
+  timeRange?: TimeRange;
+}
+
+/** Execute a VizSpec: inject runtime filters into its SQL, run it, resolve
+ * the axis→column binding against the ACTUAL result columns, and validate
+ * the shape. Degrade-never-fail: problems become machine-readable warnings
+ * (and skipped filters) and the data still returns, so both renderers and
+ * the agent can react. */
+export async function execute(
+  client: InfinoClient,
+  spec: VizSpec,
+  options: ExecuteOptions = {},
+): Promise<ExecuteResult> {
   const started = Date.now();
-  let rows = await client.querySql(spec.source.raw_query);
+
+  const merged = mergeFilters(options.savedFilters ?? [], options.filters ?? []);
+  if (options.timeRange) {
+    merged.push(timeRangeFilter(options.timeRange, spec.source.time_column));
+  }
+  const injection = injectFilters(spec.source.raw_query, merged);
+
+  let rows = await client.querySql(injection.sql);
 
   const warnings: Warning[] = [];
   const truncated = rows.length > MAX_ROWS;
@@ -37,7 +61,9 @@ export async function execute(client: InfinoClient, spec: VizSpec): Promise<Exec
       row_count: rows.length,
       truncated,
       took_ms: Date.now() - started,
-      executed_query: spec.source.raw_query,
+      executed_query: injection.sql,
+      filters_applied: injection.applied,
+      filters_skipped: injection.skipped,
       warnings,
       binding,
     },

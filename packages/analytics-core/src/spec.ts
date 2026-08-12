@@ -98,6 +98,10 @@ export interface ExecuteResult {
     truncated: boolean;
     took_ms: number;
     executed_query: string;
+    /** Field names of runtime filters successfully injected into the SQL. */
+    filters_applied: string[];
+    /** Filters the rewriter could not safely inject; the query still ran. */
+    filters_skipped: { filter: string; reason: string }[];
     warnings: Warning[];
     binding: Binding;
   };

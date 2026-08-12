@@ -68,7 +68,7 @@ packages/storage-sqlite   the default StorageAdapter: threads in one SQLite file
 packages/storage-infino   alternative adapter: threads as tables in the Infino
                           database itself (FINO_STORAGE=infino), no second store
 packages/analytics        the facade: new Analytics({...}) — ask() + threads (Fino),
-                          and the visualization/dashboard API (coming) on one client
+                          visualizations + dashboards (persistence API) on one client
 apps/server               the facade over HTTP: POST /api/chat (SSE) + demo UI host
 apps/web                  demo chat UI (React + ECharts); <Chart> reads only binding
 examples/                 runnable library-level integrations (single ask, sessions)
@@ -80,7 +80,9 @@ own frontend does the same against `/api/chat`.
 
 ## Status
 
-Working: conversational analytics end to end (ask → SQL → chart) with
-persistent threads: transcripts (charts included) survive restarts in
-SQLite, and reopened threads resume the model's context. Coming next:
-the visualization/dashboard persistence API on the same StorageAdapter.
+Working: conversational analytics end to end (ask -> SQL -> chart) with
+persistent threads (transcripts survive restarts, reopened threads resume
+the model's context), and the visualization/dashboard persistence API:
+saved charts with runtime filter/time-range injection at execute,
+dashboards referencing them by id, classic gateway route shapes over HTTP.
+All of it on the same StorageAdapter.

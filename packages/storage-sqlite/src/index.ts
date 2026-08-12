@@ -3,11 +3,14 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
 import type {
+  Dashboard,
+  DocStore,
   NewMessage,
   StorageAdapter,
   StoredMessage,
   Thread,
   ThreadStore,
+  Visualization,
 } from "@infino-ai/analytics-core";
 
 // The shipped default StorageAdapter: one SQLite file, no infrastructure.
@@ -55,8 +58,60 @@ function toMessage(row: MessageRow): StoredMessage {
     : { ...base, role: "assistant", events: JSON.parse(row.content).events };
 }
 
+// One table per document kind: id + updated_at columns for listing, the
+// document itself as JSON. Same pattern any database maps to.
+function sqliteDocStore<T extends { id: string; updated_at: string }>(
+  db: Database.Database,
+  table: string,
+): DocStore<T> {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS ${table} (
+      id         TEXT PRIMARY KEY,
+      updated_at TEXT NOT NULL,
+      doc        TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_${table}_updated ON ${table}(updated_at DESC);
+  `);
+  const upsert = db.prepare(
+    `INSERT INTO ${table} (id, updated_at, doc) VALUES (?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET updated_at = excluded.updated_at, doc = excluded.doc`,
+  );
+  const getOne = db.prepare(`SELECT doc FROM ${table} WHERE id = ?`);
+  const listAll = db.prepare(
+    `SELECT doc FROM ${table} ORDER BY updated_at DESC LIMIT ? OFFSET ?`,
+  );
+  const deleteOne = db.prepare(`DELETE FROM ${table} WHERE id = ?`);
+
+  return {
+    async put(doc) {
+      upsert.run(doc.id, doc.updated_at, JSON.stringify(doc));
+    },
+    async get(id) {
+      const row = getOne.get(id) as { doc: string } | undefined;
+      return row ? (JSON.parse(row.doc) as T) : null;
+    },
+    async list(opts) {
+      if (opts?.ids) {
+        const docs: T[] = [];
+        for (const id of opts.ids) {
+          const row = getOne.get(id) as { doc: string } | undefined;
+          if (row) docs.push(JSON.parse(row.doc) as T);
+        }
+        return docs.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+      }
+      const rows = listAll.all(opts?.limit ?? 500, opts?.offset ?? 0) as { doc: string }[];
+      return rows.map((r) => JSON.parse(r.doc) as T);
+    },
+    async delete(id) {
+      deleteOne.run(id);
+    },
+  };
+}
+
 export class SqliteStorage implements StorageAdapter {
   readonly threads: ThreadStore;
+  readonly visualizations: DocStore<Visualization>;
+  readonly dashboards: DocStore<Dashboard>;
   private readonly db: Database.Database;
 
   constructor(options: SqliteStorageOptions = {}) {
@@ -67,6 +122,8 @@ export class SqliteStorage implements StorageAdapter {
 
     db.pragma("journal_mode = WAL");
     db.pragma("foreign_keys = ON");
+    this.visualizations = sqliteDocStore<Visualization>(db, "visualizations");
+    this.dashboards = sqliteDocStore<Dashboard>(db, "dashboards");
     db.exec(`
       CREATE TABLE IF NOT EXISTS threads (
         id               TEXT PRIMARY KEY,

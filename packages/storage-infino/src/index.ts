@@ -1,10 +1,13 @@
 import { randomUUID } from "node:crypto";
 import type {
+  Dashboard,
+  DocStore,
   NewMessage,
   StorageAdapter,
   StoredMessage,
   Thread,
   ThreadStore,
+  Visualization,
 } from "@infino-ai/analytics-core";
 
 // A StorageAdapter backed by Infino itself: threads live as two tables in
@@ -74,6 +77,8 @@ function sqlQuote(value: string): string {
 
 export class InfinoStorage implements StorageAdapter {
   readonly threads: ThreadStore;
+  readonly visualizations: DocStore<Visualization>;
+  readonly dashboards: DocStore<Dashboard>;
 
   private readonly host: string;
   private readonly database: string;
@@ -100,6 +105,8 @@ export class InfinoStorage implements StorageAdapter {
     this.tThreads = `${prefix}threads`;
     this.tMessages = `${prefix}messages`;
     this.threads = this.buildStore();
+    this.visualizations = this.buildDocStore<Visualization>(`${prefix}visualizations`);
+    this.dashboards = this.buildDocStore<Dashboard>(`${prefix}dashboards`);
   }
 
   private async api(path: string, body?: unknown): Promise<unknown> {
@@ -160,6 +167,12 @@ export class InfinoStorage implements StorageAdapter {
         { name: "seq", type: "i64", nullable: false },
         { name: "content", type: "utf8", nullable: false },
       ]);
+      const docSchema = [
+        { name: "id", type: "utf8", nullable: false },
+        { name: "updated_at", type: "utf8", nullable: false },
+        { name: "doc", type: "utf8", nullable: false },
+      ];
+      for (const table of this.docTables) await mk(table, docSchema);
     })();
     return this.ready;
   }
@@ -324,6 +337,93 @@ export class InfinoStorage implements StorageAdapter {
         const end = upTo === -1 ? all.length : upTo;
         const limit = opts?.limit ?? 100;
         return all.slice(Math.max(0, end - limit), end);
+      },
+    };
+  }
+
+  // ── generic document store (visualizations, dashboards) ─────────────────
+  // Same write-through-cache discipline as threads: the cache is authority
+  // for anything this process wrote; the engine covers the rest.
+
+  private readonly docTables: string[] = [];
+  private readonly docCaches = new Map<string, Map<string, unknown>>();
+  private readonly docDeleted = new Map<string, Set<string>>();
+
+  private buildDocStore<T extends { id: string; updated_at: string }>(table: string): DocStore<T> {
+    this.docTables.push(table);
+    const cache = new Map<string, T>();
+    const deleted = new Set<string>();
+    this.docCaches.set(table, cache as Map<string, unknown>);
+    this.docDeleted.set(table, deleted);
+    const self = this;
+
+    const rowOf = (doc: T) => ({ id: doc.id, updated_at: doc.updated_at, doc: JSON.stringify(doc) });
+
+    return {
+      async put(doc) {
+        await self.ensureTables();
+        const exists = cache.has(doc.id) || (await this.get(doc.id)) !== null;
+        cache.set(doc.id, structuredClone(doc));
+        deleted.delete(doc.id);
+        if (exists) {
+          const predicate = encodeURIComponent(`id = ${sqlQuote(doc.id)}`);
+          await self.api(`/v1/update/${self.database}?table=${table}&predicate=${predicate}`, {
+            data: [rowOf(doc)],
+          });
+        } else {
+          await self.api(`/v1/append/${self.database}?table=${table}`, { data: [rowOf(doc)] });
+        }
+      },
+      async get(id) {
+        await self.ensureTables();
+        if (deleted.has(id)) return null;
+        const hit = cache.get(id);
+        if (hit) return structuredClone(hit);
+        try {
+          const rows = (await self.sql(
+            `SELECT doc FROM ${table} WHERE id = ${sqlQuote(id)}`,
+          )) as { doc: string }[];
+          if (rows.length === 0) return null;
+          const doc = JSON.parse(rows[0].doc) as T;
+          cache.set(id, doc);
+          return structuredClone(doc);
+        } catch {
+          return null; // table may not exist yet on a fresh database
+        }
+      },
+      async list(opts) {
+        await self.ensureTables();
+        let engineRows: { doc: string }[] = [];
+        try {
+          engineRows = (await self.sql(
+            `SELECT doc FROM ${table} ORDER BY updated_at DESC LIMIT 1000`,
+          )) as { doc: string }[];
+        } catch {
+          engineRows = [];
+        }
+        const byId = new Map<string, T>(
+          engineRows.map((r) => {
+            const d = JSON.parse(r.doc) as T;
+            return [d.id, d];
+          }),
+        );
+        for (const [id, doc] of cache) byId.set(id, doc);
+        let all = [...byId.values()].filter((d) => !deleted.has(d.id));
+        if (opts?.ids) {
+          const wanted = new Set(opts.ids);
+          all = all.filter((d) => wanted.has(d.id));
+        }
+        all.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+        const offset = opts?.offset ?? 0;
+        return all.slice(offset, offset + (opts?.limit ?? 500)).map((d) => structuredClone(d));
+      },
+      async delete(id) {
+        await self.ensureTables();
+        cache.delete(id);
+        deleted.add(id);
+        await self.apiSafe(
+          `/v1/delete/${self.database}?table=${table}&predicate=${encodeURIComponent(`id = ${sqlQuote(id)}`)}`,
+        );
       },
     };
   }

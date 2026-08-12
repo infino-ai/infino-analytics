@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { ChatEvent } from "./events.js";
+import type { Dashboard, Visualization } from "./viz.js";
 
 // The storage seam. Consumers (the facade, the HTTP server) type against
 // this interface only — swapping databases means constructing a different
@@ -54,11 +55,49 @@ export interface ThreadStore {
   ): Promise<StoredMessage[]>;
 }
 
+/** Generic document persistence: what visualizations and dashboards need.
+ * Documents carry their own id; put() is a full replace (upsert). */
+export interface DocStore<T extends { id: string; updated_at: string }> {
+  put(doc: T): Promise<void>;
+  get(id: string): Promise<T | null>;
+  /** All matching docs, most recently updated first. */
+  list(opts?: { ids?: string[]; limit?: number; offset?: number }): Promise<T[]>;
+  delete(id: string): Promise<void>;
+}
+
 export interface StorageAdapter {
   threads: ThreadStore;
-  /** Visualization/dashboard stores join this interface with the
-   * persistence API; the adapter object is shared across all surfaces. */
+  visualizations: DocStore<Visualization>;
+  dashboards: DocStore<Dashboard>;
   close?(): void | Promise<void>;
+}
+
+/** In-memory DocStore; the reference implementation of the interface. */
+export function memoryDocStore<T extends { id: string; updated_at: string }>(): DocStore<T> {
+  const docs = new Map<string, T>();
+  return {
+    async put(doc) {
+      docs.set(doc.id, structuredClone(doc));
+    },
+    async get(id) {
+      const doc = docs.get(id);
+      return doc ? structuredClone(doc) : null;
+    },
+    async list(opts) {
+      let all = [...docs.values()];
+      if (opts?.ids) {
+        const wanted = new Set(opts.ids);
+        all = all.filter((d) => wanted.has(d.id));
+      }
+      all.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+      const offset = opts?.offset ?? 0;
+      const limit = opts?.limit ?? 500;
+      return all.slice(offset, offset + limit).map((d) => structuredClone(d));
+    },
+    async delete(id) {
+      docs.delete(id);
+    },
+  };
 }
 
 /** Event types worth persisting — the durable record of a turn. status and
@@ -74,6 +113,8 @@ export function isPersistentEvent(event: ChatEvent): boolean {
 
 export class InMemoryStorage implements StorageAdapter {
   readonly threads: ThreadStore;
+  readonly visualizations = memoryDocStore<Visualization>();
+  readonly dashboards = memoryDocStore<Dashboard>();
 
   constructor() {
     const threads = new Map<string, Thread>();

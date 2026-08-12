@@ -197,10 +197,46 @@ of a conforming ECharts renderer.
 - Aborting via `opts.signal` ends the run with a `done` event and no error:
   cancellation is a normal outcome.
 
-## What's next on this facade
+## Visualizations and dashboards
 
-`visualizations` and `dashboards` namespaces: persistence (create, get,
-list, update, delete) and execution for the same `VizSpec` objects the agent
-emits, with dashboard-level filter and time-range injection. Pure data
-plane, no LLM in the path. They arrive on the same `StorageAdapter` object
-threads use. The event and chart contracts above will not change shape.
+The persistence + execution surface for saved charts: pure data plane, no
+LLM anywhere in this path. Both namespaces live on the same
+`StorageAdapter` object threads use.
+
+### `visualizations`
+
+| Method | Meaning |
+|---|---|
+| `create(input)` | Lenient create: identity and defaults filled in. The input is a `VizSpec` plus optional `filters`/`time_range`/`tags`, exactly what a `chart` event carries, so pinning from chat is `create({ ...event.spec })` |
+| `get(id)` / `list({ids?, limit?, offset?})` | Fetch; `list` returns newest-updated first |
+| `put(id, input)` | Strict full-document replace |
+| `update(id, patch)` | RFC 7396 merge patch (`null` removes a key; `id`, `schema_version`, `created_at`, `created_by` are protected) |
+| `delete(id)` | Remove |
+| `execute(idOrSpec, {filters?, timeRange?})` | Run it: runtime filters are AND-injected into the SQL (they win over saved filters on field collision), `timeRange` becomes a between-filter on the spec's `time_column`. Passing an inline spec instead of an id executes without persisting |
+
+Filter operators: `is`, `is_not`, `is_one_of`, `is_not_one_of`,
+`is_between`, `is_not_between`, `exists`, `does_not_exist`, `contains`.
+Injection is AST-level (parse, AND into `WHERE`, re-serialize), so filters
+apply before aggregation. Degrade-never-fail: a filter that can't be
+injected safely lands in `metadata.filters_skipped` with a reason and the
+query still runs; `metadata.filters_applied` lists what made it in.
+
+### `dashboards`
+
+Same CRUD shape (`create/get/list/put/update/delete`). A dashboard is
+layout + references: panels point at visualizations **by id** (dangling
+references are rejected at write time), plus `markdown` and `divider`
+panels, dashboard-level `filters`/`time_range`, and a 48-column grid
+`layout` per panel that round-trips untouched. There is deliberately no
+dashboard-execute: consumers fan out one `visualizations.execute()` per
+panel, passing the dashboard's filters and time range; layout and
+rendering are theirs.
+
+### Over HTTP
+
+The reference server exposes both namespaces with classic gateway route
+shapes (`GET/POST /visualizations`, `PUT/PATCH/GET/DELETE
+/visualizations/:id`, `POST /visualizations/:id/data` with the reserved id
+`_execute` for inline specs; same pattern under `/dashboards`), returning
+`{ id, kind, created_at, updated_at, attributes }` envelopes. No auth on
+purpose; put your gateway in front.

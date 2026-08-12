@@ -2,7 +2,7 @@
 //
 //   INFINO_URI=https://<host>/<database> INFINO_API_KEY=... npm run dev -w @infino-ai/analytics-server
 //
-// Surface:
+// Chat surface:
 //   POST   /api/threads               → { thread } (also aliased as POST /api/sessions)
 //   GET    /api/threads               → { threads } newest-activity first
 //   GET    /api/threads/:id/messages  → { messages } the persisted transcript
@@ -10,9 +10,23 @@
 //   POST   /api/chat                  → SSE stream of ChatEvents ({ threadId, question })
 //   GET    /*                         → the demo web UI (when built)
 //
-// The viz/dashboard persistence routes (parity API) land in the next phase.
-// One process on purpose: it splits into a standalone deployable when that
-// API arrives.
+// Persistence surface (route shapes follow the classic gateway contract, so
+// existing client code maps one-to-one; responses are envelopes
+// { id, kind, created_at, updated_at, attributes }):
+//   GET    /visualizations            list; ?ids=a,b serves fetch-many
+//   POST   /visualizations            lenient create (server fills defaults)
+//   PUT    /visualizations/:id        strict full-shape upsert
+//   PATCH  /visualizations/:id        RFC 7396 merge patch
+//   GET    /visualizations/:id
+//   DELETE /visualizations/:id
+//   POST   /visualizations/:id/data   execute; id "_execute" runs the inline
+//                                     body.visualization without persisting
+//   GET/POST /dashboards, PUT/PATCH/GET/DELETE /dashboards/:id
+//   (deliberately no POST /dashboards/:id/data — clients fan out one
+//   execute per panel with merged filters; layout and rendering are theirs)
+//
+// No auth on purpose: this is a reference server; put your gateway's
+// authn/z in front (or add middleware here) before exposing it.
 
 import { readFileSync, existsSync } from "node:fs";
 import { join, dirname, extname } from "node:path";
@@ -139,6 +153,148 @@ app.post("/api/chat", async (c) => {
       Connection: "keep-alive",
     },
   });
+});
+
+// ── the persistence surface: visualizations + dashboards ──────────────────
+
+type Enveloped = { id: string; created_at: string; updated_at: string };
+const envelope = (kind: "visualization" | "dashboard", doc: Enveloped) => ({
+  id: doc.id,
+  kind,
+  created_at: doc.created_at,
+  updated_at: doc.updated_at,
+  attributes: doc,
+});
+
+// Facade errors carry meaning in their message; map them to status codes at
+// the HTTP boundary.
+function errStatus(err: unknown): 400 | 404 {
+  return err instanceof Error && err.message.startsWith("unknown") ? 404 : 400;
+}
+const errBody = (err: unknown) => ({
+  error: err instanceof Error ? err.message.slice(0, 500) : "bad request",
+});
+
+function listParams(c: { req: { query: (k: string) => string | undefined } }) {
+  const ids = c.req.query("ids");
+  return {
+    ids: ids ? ids.split(",").filter(Boolean) : undefined,
+    limit: Math.min(Number(c.req.query("limit") ?? 500), 1000),
+    offset: Number(c.req.query("offset") ?? 0),
+  };
+}
+
+app.get("/visualizations", async (c) => {
+  const items = await analytics.visualizations.list(listParams(c));
+  return c.json({ items: items.map((v) => envelope("visualization", v)) });
+});
+
+app.post("/visualizations", async (c) => {
+  try {
+    const doc = await analytics.visualizations.create(await c.req.json());
+    return c.json(envelope("visualization", doc), 201);
+  } catch (err) {
+    return c.json(errBody(err), 400);
+  }
+});
+
+app.get("/visualizations/:id", async (c) => {
+  const doc = await analytics.visualizations.get(c.req.param("id"));
+  if (!doc) return c.json({ error: "unknown visualization" }, 404);
+  return c.json(envelope("visualization", doc));
+});
+
+app.put("/visualizations/:id", async (c) => {
+  try {
+    const doc = await analytics.visualizations.put(c.req.param("id"), await c.req.json());
+    return c.json(envelope("visualization", doc));
+  } catch (err) {
+    return c.json(errBody(err), 400);
+  }
+});
+
+app.patch("/visualizations/:id", async (c) => {
+  try {
+    const doc = await analytics.visualizations.update(c.req.param("id"), await c.req.json());
+    return c.json(envelope("visualization", doc));
+  } catch (err) {
+    return c.json(errBody(err), errStatus(err));
+  }
+});
+
+app.delete("/visualizations/:id", async (c) => {
+  await analytics.visualizations.delete(c.req.param("id"));
+  return c.body(null, 204);
+});
+
+// Execute: runtime filters + time range injected into the SQL. The reserved
+// id "_execute" runs the inline body.visualization without persisting it.
+app.post("/visualizations/:id/data", async (c) => {
+  const id = c.req.param("id");
+  const body = await c.req.json<{
+    filters?: unknown;
+    time_range?: unknown;
+    visualization?: unknown;
+  }>().catch(() => ({}) as Record<string, never>);
+  try {
+    const target =
+      id === "_execute"
+        ? (body.visualization as Parameters<typeof analytics.visualizations.execute>[0])
+        : id;
+    if (id === "_execute" && !body.visualization) {
+      return c.json({ error: "_execute needs body.visualization" }, 400);
+    }
+    const result = await analytics.visualizations.execute(target, {
+      filters: body.filters as never,
+      timeRange: body.time_range as never,
+    });
+    return c.json(result);
+  } catch (err) {
+    return c.json(errBody(err), errStatus(err));
+  }
+});
+
+app.get("/dashboards", async (c) => {
+  const items = await analytics.dashboards.list(listParams(c));
+  return c.json({ items: items.map((d) => envelope("dashboard", d)) });
+});
+
+app.post("/dashboards", async (c) => {
+  try {
+    const doc = await analytics.dashboards.create(await c.req.json());
+    return c.json(envelope("dashboard", doc), 201);
+  } catch (err) {
+    return c.json(errBody(err), 400);
+  }
+});
+
+app.get("/dashboards/:id", async (c) => {
+  const doc = await analytics.dashboards.get(c.req.param("id"));
+  if (!doc) return c.json({ error: "unknown dashboard" }, 404);
+  return c.json(envelope("dashboard", doc));
+});
+
+app.put("/dashboards/:id", async (c) => {
+  try {
+    const doc = await analytics.dashboards.put(c.req.param("id"), await c.req.json());
+    return c.json(envelope("dashboard", doc));
+  } catch (err) {
+    return c.json(errBody(err), 400);
+  }
+});
+
+app.patch("/dashboards/:id", async (c) => {
+  try {
+    const doc = await analytics.dashboards.update(c.req.param("id"), await c.req.json());
+    return c.json(envelope("dashboard", doc));
+  } catch (err) {
+    return c.json(errBody(err), errStatus(err));
+  }
+});
+
+app.delete("/dashboards/:id", async (c) => {
+  await analytics.dashboards.delete(c.req.param("id"));
+  return c.body(null, 204);
 });
 
 // Static demo UI (built by apps/web). Falls back to a pointer message in dev.
