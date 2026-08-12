@@ -1,23 +1,22 @@
-/* Fino demo — dark "instrument" theme.
-   A conversational analytics UI on a warm near-black ground, the register
-   of an engineer's dark IDE / Claude Desktop: prose in Archivo, data and
-   labels in Fragment Mono, a single vermilion accent, hairline rules, and
-   numbered figures (FIG. NN) for charts. Token names keep the paper/ink
-   lineage from the light origin; only the values are dark. */
+/* Fino demo — light "datasheet" theme.
+   Typeset like the technical documents engineers actually read, in the
+   register of a modern analytics notebook: paper ground, ink text, a
+   single vermilion accent, hairline rules, prose in Archivo, data and
+   labels in Fragment Mono. Figures sit on softly tinted cards. */
 
 :root {
-  --paper: #17171b; /* ground — warm near-black */
-  --paper-raise: #1f1f25; /* raised surfaces: code blocks, cards */
-  --ink: #e9e7e1; /* primary text — warm off-white */
-  --ink-dim: #9d9c95; /* secondary */
-  --ink-faint: #66655f; /* labels, captions, metadata */
-  --rule: #2c2c33; /* hairlines */
-  --rule-dark: #3d3d45; /* stronger borders: card/figure edges */
-  --accent: #f0532f; /* vermilion — instrumentation red, lifted for dark */
-  --accent-soft: rgba(240, 83, 47, 0.13);
-  --cobalt: #6f9aff;
-  --green: #5bc98a; /* tool succeeded */
-  --red: #e06c6c; /* tool failed / error */
+  --paper: #fdfdfc; /* ground — white with a breath of warmth */
+  --paper-raise: #f1efe8; /* raised surfaces: bubbles, code blocks */
+  --ink: #1b1b1f; /* primary text */
+  --ink-dim: #5c5c63; /* secondary */
+  --ink-faint: #97968f; /* labels, captions, metadata */
+  --rule: #d8d6cd; /* hairlines */
+  --rule-dark: #bab7ac; /* stronger borders: inputs, bubbles */
+  --accent: #d23b1e; /* vermilion — instrumentation red */
+  --accent-soft: rgba(210, 59, 30, 0.08);
+  --cobalt: #2b50aa;
+  --green: #1f8a70; /* tool succeeded */
+  --red: #b3372a; /* tool failed / error */
   --mono: "Fragment Mono", ui-monospace, monospace;
   --sans: "Archivo", -apple-system, sans-serif;
 }
@@ -79,7 +78,6 @@ body {
   flex-direction: column;
   padding: 14px 10px 14px 20px;
   border-right: 1px solid var(--rule);
-  background: rgba(255, 255, 255, 0.012);
 }
 
 .newthread {
@@ -90,7 +88,7 @@ body {
   color: var(--ink);
   background: none;
   border: 1px solid var(--rule-dark);
-  border-radius: 4px;
+  border-radius: 7px;
   padding: 7px 10px;
   margin-right: 10px;
   cursor: pointer;
@@ -109,7 +107,7 @@ body {
   display: flex;
   align-items: center;
   margin-right: 10px;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 .threaditem:hover { background: var(--paper-raise); }
 .threaditem.active { background: var(--accent-soft); }
@@ -157,21 +155,21 @@ body {
 .header {
   display: flex;
   align-items: baseline;
-  gap: 12px;
-  padding: 20px 36px 12px 20px;
+  gap: 10px;
+  padding: 11px 36px 9px 20px;
   border-bottom: 1px solid var(--rule);
 }
 
 .mark {
   color: var(--accent);
-  font-size: 24px;
+  font-size: 19px;
   line-height: 0;
   align-self: center;
 }
 
 .wordmark {
   font-weight: 700;
-  font-size: 26px;
+  font-size: 19px;
   letter-spacing: 0.01em;
 }
 
@@ -235,12 +233,13 @@ body {
 }
 .user-bubble {
   max-width: 80%;
-  background: var(--paper-raise);
+  background: #fff;
   border: 1px solid var(--rule-dark);
-  border-radius: 10px 10px 2px 10px;
-  padding: 9px 15px;
-  font-size: 15px;
-  line-height: 1.45;
+  border-radius: 14px 14px 3px 14px;
+  padding: 8px 15px;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.55;
   white-space: pre-wrap;
 }
 
@@ -298,7 +297,7 @@ body {
   padding: 10px 13px;
   background: var(--paper-raise);
   border: 1px solid var(--rule);
-  border-radius: 4px;
+  border-radius: 6px;
   overflow-x: auto;
 }
 .stepchip-inner code {
@@ -361,7 +360,7 @@ body {
   padding: 12px 14px;
   background: var(--paper-raise);
   border: 1px solid var(--rule);
-  border-radius: 4px;
+  border-radius: 6px;
   overflow-x: auto;
 }
 .sqlblock code {
@@ -388,7 +387,7 @@ body {
   color: var(--ink-faint);
   background: none;
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: 4px;
   padding: 2px 7px;
   cursor: pointer;
   opacity: 0;
@@ -430,13 +429,13 @@ body {
   font-size: 0.88em;
   background: var(--paper-raise);
   border: 1px solid var(--rule);
-  border-radius: 3px;
+  border-radius: 4px;
   padding: 1px 5px;
 }
 .md pre {
   background: var(--paper-raise);
   border: 1px solid var(--rule);
-  border-radius: 4px;
+  border-radius: 6px;
   padding: 12px 14px;
   overflow-x: auto;
 }
@@ -493,13 +492,13 @@ body {
 
 /* ── figures ────────────────────────────────────────────── */
 
+/* figures print as plates: white ground, ink border, hard offset shadow */
 .card {
   margin: 20px 0 8px;
   animation: settle 0.35s ease-out;
-  border: 1px solid var(--rule-dark);
-  border-radius: 6px;
-  background: var(--paper-raise);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--ink);
+  background: #fff;
+  box-shadow: 4px 4px 0 var(--rule);
 }
 .card-head {
   display: flex;
@@ -599,7 +598,7 @@ table.data tr:hover td { background: var(--accent-soft); }
 
 /* ── composer: heavy top rule, command line on paper ────── */
 
-.composer { padding: 14px 0 26px; border-top: 1px solid var(--rule); }
+.composer { padding: 10px 0 26px; }
 
 .chips {
   display: flex;
@@ -613,6 +612,7 @@ table.data tr:hover td { background: var(--accent-soft); }
   color: var(--ink-dim);
   background: none;
   border: 1px solid var(--rule);
+  border-radius: 999px;
   padding: 5px 13px;
   cursor: pointer;
   transition: all 0.12s;
@@ -627,9 +627,9 @@ table.data tr:hover td { background: var(--accent-soft); }
   display: flex;
   gap: 12px;
   align-items: flex-end;
-  background: var(--paper-raise);
+  background: #fff;
   border: 1.5px solid var(--rule-dark);
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 6px 6px 6px 16px;
 }
 .inputrow:focus-within { border-color: var(--accent); }
@@ -661,7 +661,7 @@ table.data tr:hover td { background: var(--accent-soft); }
   background: var(--ink);
   color: var(--paper);
   border: none;
-  border-radius: 5px;
+  border-radius: 7px;
   padding: 11px 22px;
   cursor: pointer;
   transition: background 0.12s;
