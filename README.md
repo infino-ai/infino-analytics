@@ -77,6 +77,32 @@ The render contract in one line: the server resolves `metadata.binding`
 (axis → actual result column) and the renderer reads only that — your
 own frontend does the same against `/api/chat`.
 
+## Forking this kit
+
+The intended path, in the order most forks take it:
+
+1. **Point it at your data.** Copy `.env.example` to `.env`, set
+   `INFINO_URI`/`INFINO_API_KEY` to your database, and write your own
+   loader (`ingestion/` is an example, not a framework). Set
+   `FINO_SUGGESTIONS` to questions that fit your data.
+2. **Keep or replace the frontend.** `apps/web` is yours to rebrand, or
+   drop it and build against the HTTP surface: `/api/chat` (SSE of
+   ChatEvents), `/api/threads`, `/visualizations`, `/dashboards`.
+   `toEChartsOption` (from `@infino-ai/analytics`, or the browser-safe
+   `@infino-ai/analytics/echarts`) turns any executed visualization into a
+   render plan; pass a theme to match your design system.
+3. **Swap the storage.** Implement `StorageAdapter` over your database and
+   pass it to `new Analytics({storage})`; the bundled SQLite and Infino
+   adapters are the worked examples.
+4. **Swap the LLM harness if you need to.** `packages/agent` is the seam:
+   anything that yields `ChatEvent`s fits. The contract layer
+   (`packages/analytics-core`) and everything above it stay untouched.
+5. **Put your gateway in front.** The reference server ships without
+   auth on purpose.
+
+`CLAUDE.md` (root and `packages/analytics/`) orients coding agents working
+in a fork — the load-bearing contracts are spelled out there.
+
 ## Status
 
 Working: conversational analytics end to end (ask -> SQL -> chart) with
