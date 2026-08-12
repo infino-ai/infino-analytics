@@ -211,21 +211,6 @@ body {
 }
 .pagekeep.show > .body { flex: 1; min-height: 0; }
 
-.header .status {
-  margin-left: auto;
-  font-family: var(--mono);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--ink);
-}
-.header .status::before {
-  content: "●";
-  color: var(--accent);
-  margin-right: 7px;
-  font-size: 9px;
-  vertical-align: 1px;
-}
 
 /* ── thread: ruled sheet with a margin rail ─────────────── */
 

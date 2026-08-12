@@ -18,7 +18,7 @@ function useRoute(): string {
 }
 
 const NAV = [
-  { path: "/chat", label: "chat" },
+  { path: "/chat", label: "fino" },
   { path: "/dashboards", label: "dashboards" },
 ];
 
@@ -34,7 +34,7 @@ export default function App() {
         <span className="mark">
           <FinoMark />
         </span>
-        <span className="wordmark">Fino</span>
+        <span className="wordmark">Infino Analytics</span>
         <nav className="nav">
           {NAV.map((n) => (
             <a className={section === n.path ? "navlink active" : "navlink"} href={`#${n.path}`} key={n.path}>
@@ -42,7 +42,6 @@ export default function App() {
             </a>
           ))}
         </nav>
-        <span className="status">live</span>
       </header>
       {/* Chat stays mounted while other pages show, so navigating away
           doesn't drop an in-flight turn or the open thread. */}
