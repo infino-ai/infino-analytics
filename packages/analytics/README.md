@@ -131,14 +131,11 @@ Bundled adapters:
 - `InMemoryStorage` (the default): zero setup, nothing survives a restart.
 - `SqliteStorage` (`@infino-ai/analytics-storage-sqlite`): one file, WAL
   mode, no infrastructure; right for development and single-node production.
-- `InfinoStorage` (`@infino-ai/analytics-storage-infino`): threads live as
-  two tables in the Infino database itself, so a deployment already on
-  Infino Cloud needs no second datastore. Appends and predicate
-  update/delete map straight onto the engine; a write-through cache covers
-  the few seconds before an appended row becomes queryable.
 
-For another database, implement the `ThreadStore` methods above over it;
-the interface is async throughout, so network-backed stores fit naturally.
+Application state is yours to own. For your database, implement the
+`ThreadStore` methods above over it; the interface is async throughout, so
+network-backed stores fit naturally, and the two bundled adapters are the
+worked examples.
 
 ## Event reference
 

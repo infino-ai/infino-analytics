@@ -16,7 +16,6 @@ npm run dev              # builds web, starts the reference server on :8787
 
 The server needs `INFINO_URI` (https://<host>/<database>), `INFINO_API_KEY`,
 and `ANTHROPIC_API_KEY`. Optional: `FINO_MODEL`, `FINO_DB` (SQLite path),
-`FINO_STORAGE=infino` (threads in the Infino database instead of SQLite),
 `FINO_SUGGESTIONS` (pipe-separated question chips), `PORT`.
 
 There is no test suite; verification is `npm run typecheck`, a web build,
@@ -29,8 +28,7 @@ packages/analytics-core     contract layer: VizSpec, ChatEvent, execute(),
                             filter injection, StorageAdapter. No LLM code.
 packages/agent              the LLM harness (Claude Agent SDK) + the
                             create_chart tool + system prompt. Replaceable.
-packages/storage-sqlite     default StorageAdapter (one SQLite file)
-packages/storage-infino     StorageAdapter over Infino engine tables
+packages/storage-sqlite     reference StorageAdapter (one SQLite file)
 packages/analytics          the facade consumers install: Analytics class,
                             toEChartsOption. Depends on all of the above.
 apps/server                 the facade over HTTP (Hono): /api/chat SSE,
