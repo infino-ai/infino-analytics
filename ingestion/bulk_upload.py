@@ -14,13 +14,20 @@ What it demonstrates:
 Usage:
     INFINO_API_KEY=... python ingestion/bulk_upload.py \
         --database my-db --table events --file data.ndjson \
-        [--host https://api.platform.infino.ws] [--max-bytes 3200000]
+        [--schema schema.json] [--host https://api.platform.infino.ws] \
+        [--max-bytes 3200000]
 
 Input is NDJSON: one JSON object per line, flat keys. Values may be
-strings, numbers, or booleans; the schema is inferred from the first 200
-rows (numbers become f64 unless every observed value is integral).
-Timestamps are best stored twice — an ISO-8601 string for readability and
-epoch milliseconds (i64) for range filters.
+strings, numbers, or booleans.
+
+The table schema comes from --schema when given: a JSON array of
+{"name", "type", "nullable"} columns, types utf8 | i64 | f64 | bool.
+Prefer an explicit schema for production loads. Without one, the schema
+is inferred from the first 200 rows, which is convenient but can guess
+wrong: a column that is integral in the sample but fractional later, or
+one that only appears after the sample, will mis-type. Timestamps are
+best stored twice — an ISO-8601 string for readability and epoch
+milliseconds (i64) for range filters.
 """
 
 import argparse
@@ -175,6 +182,10 @@ def main() -> None:
     parser.add_argument("--database", required=True)
     parser.add_argument("--table", required=True)
     parser.add_argument("--file", required=True, help="NDJSON file, one row per line")
+    parser.add_argument(
+        "--schema",
+        help="JSON file with the explicit column schema; inferred from the data when omitted",
+    )
     parser.add_argument("--host", default="https://api.platform.infino.ws")
     parser.add_argument("--max-bytes", type=float, default=DEFAULT_MAX_PAYLOAD_BYTES)
     args = parser.parse_args()
@@ -185,17 +196,32 @@ def main() -> None:
 
     client = InfinoRest(args.host, args.database, api_key)
 
-    # Schema from a sample of the data, then the table.
-    sample: List[Dict[str, Any]] = []
-    for row in read_ndjson(args.file):
-        sample.append(row)
-        if len(sample) >= SCHEMA_SAMPLE_ROWS:
-            break
-    if not sample:
-        raise SystemExit(f"{args.file} contains no rows")
-    schema = infer_schema(sample)
+    # Explicit schema when provided; otherwise inferred from a sample.
+    if args.schema:
+        with open(args.schema, "r", encoding="utf-8") as fh:
+            schema = json.load(fh)
+        if not isinstance(schema, list) or not all(
+            isinstance(c, dict) and "name" in c and "type" in c for c in schema
+        ):
+            raise SystemExit(f'{args.schema}: expected [{{"name", "type", "nullable"?}}, ...]')
+        for col in schema:
+            col.setdefault("nullable", False)
+        origin = "explicit"
+    else:
+        sample: List[Dict[str, Any]] = []
+        for row in read_ndjson(args.file):
+            sample.append(row)
+            if len(sample) >= SCHEMA_SAMPLE_ROWS:
+                break
+        if not sample:
+            raise SystemExit(f"{args.file} contains no rows")
+        schema = infer_schema(sample)
+        origin = f"inferred from first {len(sample)} rows"
     print(f"target: {args.host}/{args.database} · table {args.table}")
-    print(f"schema ({len(schema)} columns): " + ", ".join(f"{c['name']}:{c['type']}" for c in schema))
+    print(
+        f"schema ({len(schema)} columns, {origin}): "
+        + ", ".join(f"{c['name']}:{c['type']}" for c in schema)
+    )
     client.create_table(args.table, schema)
 
     # Stream the whole file through the chunker.

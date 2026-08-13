@@ -16,8 +16,11 @@ INFINO_API_KEY=inf_... python3 bulk_upload.py \
   --database my-db --table events --file data.ndjson
 ```
 
-- Infers the table schema (`utf8` / `i64` / `f64` / `bool`, nullability)
-  from the first 200 rows and creates the table.
+- Takes an explicit schema with `--schema schema.json` (a JSON array of
+  `{"name", "type", "nullable"}` columns) — prefer this for production
+  loads. Without it, the schema is inferred from the first 200 rows,
+  which can guess wrong when a column is integral in the sample but
+  fractional later, or appears only after the sample.
 - Batches rows by payload size (default 3.2 MB), flushing before a row
   would push a batch over the limit.
 - Retries while the database activates (HTTP 503) and verifies the final
