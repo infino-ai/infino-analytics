@@ -145,7 +145,7 @@ export interface Dashboards {
  *   full transcript (what the user saw, charts included), and the
  *   agent-harness session pointer that lets a reopened thread resume with
  *   the model's context.
- * - `visualizations` / `dashboards` (next phase) — the persistence and
+ * - `visualizations` / `dashboards` — the persistence and
  *   execution API for charts and dashboards. Pure data plane: consumable
  *   entirely without Fino or any LLM, exactly like a classic analytics
  *   backend.
