@@ -261,9 +261,8 @@ its worked example.
 
 ### Over HTTP
 
-The reference server exposes both namespaces with classic gateway route
-shapes (`GET/POST /visualizations`, `PUT/PATCH/GET/DELETE
-/visualizations/:id`, `POST /visualizations/:id/data` with the reserved id
+The reference server exposes both namespaces over REST (`GET/POST
+/visualizations`, `PUT/PATCH/GET/DELETE /visualizations/:id`, `POST /visualizations/:id/data` with the reserved id
 `_execute` for inline specs; same pattern under `/dashboards`), returning
 `{ id, kind, created_at, updated_at, attributes }` envelopes. No auth on
 purpose; put your gateway in front.

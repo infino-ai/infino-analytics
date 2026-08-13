@@ -109,5 +109,5 @@ Working: conversational analytics end to end (ask -> SQL -> chart) with
 persistent threads (transcripts survive restarts, reopened threads resume
 the model's context), and the visualization/dashboard persistence API:
 saved charts with runtime filter/time-range injection at execute,
-dashboards referencing them by id, classic gateway route shapes over HTTP.
+dashboards referencing them by id, stable REST shapes over HTTP.
 All of it on the same StorageAdapter.

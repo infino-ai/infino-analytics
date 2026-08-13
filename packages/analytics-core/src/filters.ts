@@ -20,14 +20,14 @@ export interface InjectionResult {
 }
 
 /** Merge saved filters with request filters: request wins on field
- * collision, same as the legacy gateway. */
+ * collision. */
 export function mergeFilters(saved: Filter[], request: Filter[]): Filter[] {
   const requestFields = new Set(request.map((f) => f.field));
   return [...saved.filter((f) => !requestFields.has(f.field)), ...request];
 }
 
 /** A time range is just a synthetic between-filter on the source's time
- * column (default "@timestamp", per the legacy convention). */
+ * column (default "@timestamp"). */
 export function timeRangeFilter(range: TimeRange, timeColumn: string | undefined): Filter {
   return {
     field: timeColumn ?? "@timestamp",

@@ -3,7 +3,7 @@ import type { ExecuteResult, VizSpec } from "@infino-ai/analytics-core";
 // The reference renderer as a pure function: a stored visualization (or any
 // VizSpec) plus its executed result, in; something a chart library accepts,
 // out. This is how "render it in your own frontend" works without writing
-// mapping code — the same role the classic SDK's option helper played.
+// mapping code.
 //
 // It reads ONLY result.metadata.binding to find columns — never the SQL,
 // never raw aliases — which is the render contract everything else in the

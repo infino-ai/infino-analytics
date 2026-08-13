@@ -52,8 +52,8 @@ export {
   NewVisualizationSchema,
   NewDashboardSchema,
 } from "@infino-ai/analytics-core";
-// The reference renderer, legacy-style: compute chart options wherever you
-// run this package (typically your backend; ship plan.option as JSON).
+// The reference renderer: compute chart options wherever you run this
+// package (typically your backend; ship plan.option as JSON).
 // Browser bundles import the same function from "@infino-ai/analytics/echarts".
 export { toEChartsOption } from "./echarts.js";
 export type { RenderPlan, ChartTheme } from "./echarts.js";
@@ -300,9 +300,8 @@ function buildVisualizations(storage: StorageAdapter, client: InfinoClient): Vis
 function buildDashboards(storage: StorageAdapter, visualizations: Visualizations): Dashboards {
   const store = storage.dashboards;
 
-  // Validation improvement over legacy: dashboards reference
-  // visualizations by id, so dangling references fail at write time, not
-  // at render time.
+  // Dashboards reference visualizations by id, so dangling references
+  // fail at write time, not at render time.
   async function checkRefs(panels: Dashboard["panels"]): Promise<void> {
     const ids = panels.flatMap((p) => (p.kind === "visualization" ? [p.viz_id] : []));
     if (ids.length === 0) return;

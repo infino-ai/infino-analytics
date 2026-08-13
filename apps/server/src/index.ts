@@ -10,8 +10,7 @@
 //   POST   /api/chat                  → SSE stream of ChatEvents ({ threadId, question })
 //   GET    /*                         → the demo web UI (when built)
 //
-// Persistence surface (route shapes follow the classic gateway contract, so
-// existing client code maps one-to-one; responses are envelopes
+// Persistence surface (REST with envelope responses
 // { id, kind, created_at, updated_at, attributes }):
 //   GET    /visualizations            list; ?ids=a,b serves fetch-many
 //   POST   /visualizations            lenient create (server fills defaults)
@@ -114,7 +113,7 @@ app.post("/api/chat", async (c) => {
   const body = await c.req.json<{ question?: string; threadId?: string; sessionId?: string }>();
   const question = body.question?.trim();
   if (!question) return c.json({ error: "question is required" }, 400);
-  // sessionId accepted as the legacy spelling of threadId.
+  // sessionId accepted as an older spelling of threadId.
   const threadId = body.threadId ?? body.sessionId;
 
   const abort = new AbortController();

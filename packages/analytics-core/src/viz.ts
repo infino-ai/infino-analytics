@@ -98,7 +98,7 @@ export const DashboardSchema = z.object({
   description: z.string().optional(),
   panels: z.array(PanelSchema).default([]),
   /** Dashboard-level filters: consumers pass these into each panel's
-   * execute call (the fan-out is client-side, as in the legacy gateway). */
+   * execute call (the fan-out is client-side by design). */
   filters: z.array(FilterSchema).default([]),
   time_range: TimeRangeSchema.optional(),
   options: z.record(z.string(), z.unknown()).default({}),

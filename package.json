@@ -20,5 +20,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p apps/web/tsconfig.json",
     "build": "npm run build -w @infino-ai/analytics-web",
     "dev": "npm run build -w @infino-ai/analytics-web && npm run dev -w @infino-ai/analytics-server"
-  }
+  },
+  "license": "Apache-2.0"
 }
