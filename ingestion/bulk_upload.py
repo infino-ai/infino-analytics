@@ -1,8 +1,8 @@
 """
 Bulk ingestion into an Infino Cloud database, with size-based chunking.
 
-Python counterpart to load-license-data.mjs for teams whose pipelines live
-in Python. Standard library only — no packages to install.
+A pattern to copy into your own pipeline. Standard library only — no
+packages to install.
 
 What it demonstrates:
 1. Creating a table with an explicit schema (inferred here from the data)

@@ -34,8 +34,8 @@ you already own:
 npm install
 
 # 1. Load data (once) — or point at a database you already have
-INFINO_API_KEY=... node ingestion/load-license-data.mjs \
-  --data-dir /path/to/csvs --database my-demo
+INFINO_API_KEY=... python3 ingestion/bulk_upload.py \
+  --database my-demo --table events --file data.ndjson
 
 # 2. Run the chat app
 INFINO_URI=https://api.platform.infino.ws/<database> \

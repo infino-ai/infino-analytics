@@ -36,7 +36,7 @@ packages/analytics          the facade consumers install: Analytics class,
 apps/server                 the facade over HTTP (Hono): /api/chat SSE,
                             /api/threads, /visualizations, /dashboards
 apps/web                    demo UI (React + Vite + Tailwind + ECharts)
-ingestion/                  standalone demo-data loader (REST, run once)
+ingestion/                  example bulk loader (REST, run once)
 ```
 
 Dependency direction: `analytics -> agent -> analytics-core`, and the
