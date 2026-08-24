@@ -68,7 +68,7 @@ export interface AnalyticsConfig {
    * by the conversational surface; the visualization/dashboard surfaces never
    * touch it. Mutually exclusive with `harness`, which replaces the default
    * outright. The key falls back to ANTHROPIC_API_KEY. */
-  llm?: { model?: string; apiKey?: string; maxBudgetUsd?: number };
+  llm?: { model?: string; apiKey?: string; maxBudgetUsd?: number; maxTurns?: number };
   /** Operator-supplied notes about the dataset — business definitions,
    * reference tables (e.g. a topic taxonomy), naming conventions. The agent
    * treats these as ground truth when choosing how to define and match
@@ -192,6 +192,7 @@ export class Analytics {
         model: config.llm?.model,
         anthropicApiKey: config.llm?.apiKey,
         maxBudgetUsd: config.llm?.maxBudgetUsd,
+        maxTurns: config.llm?.maxTurns,
         domainContext: config.domainContext,
       });
     this.storage = config.storage ?? new InMemoryStorage();

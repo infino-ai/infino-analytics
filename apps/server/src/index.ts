@@ -46,6 +46,19 @@ function requireEnv(name: string): string {
   return v;
 }
 
+// A misspelled ceiling must fail at boot: Number("lots") is NaN, and NaN
+// survives `?? DEFAULT`, so every later `turn > maxTurns` check is false.
+function numberEnv(name: string): number | undefined {
+  const v = process.env[name];
+  if (!v) return undefined;
+  const n = Number(v);
+  if (!Number.isFinite(n)) {
+    console.error(`${name} must be a number (got ${v})`);
+    process.exit(1);
+  }
+  return n;
+}
+
 // The storage seam, wired: this line decides where app state lives. Swap
 // in your own StorageAdapter (your database) without touching anything
 // below; the reference implementation is a local SQLite file.
@@ -57,14 +70,17 @@ const storage = new SqliteStorage({ path: process.env.FINO_DB ?? "./data/analyti
 // single entry here.
 const INFINO_URI = requireEnv("INFINO_URI");
 
-// Dataset notes are harness-agnostic: whichever one runs, it gets them.
+// Dataset notes and the turn ceiling are harness-agnostic: whichever one runs,
+// it gets them. FINO_MAX_BUDGET_USD is not — only Claude bills in dollars.
 const DOMAIN_CONTEXT = process.env.FINO_DOMAIN_CONTEXT;
+const MAX_TURNS = numberEnv("FINO_MAX_TURNS");
 
 const HARNESSES: Record<string, () => Promise<AgentHarness>> = {
   openai: async () =>
     (await import("@infino-ai/analytics-agent-openai")).createOpenAIHarness({
       infino: { uri: INFINO_URI },
       domainContext: DOMAIN_CONTEXT,
+      maxTurns: MAX_TURNS,
     }),
 };
 
@@ -76,13 +92,27 @@ if (selected && !(selected in HARNESSES)) {
 // Unselected → undefined → the facade's built-in default.
 const harness = selected ? await HARNESSES[selected]() : undefined;
 
+// One .env usually carries both harnesses' settings so operators can flip
+// FINO_HARNESS. Warn rather than exit — but never let a spend ceiling look
+// enforced when the selected harness bounds tokens instead.
+if (harness && process.env.FINO_MAX_BUDGET_USD) {
+  console.warn(`FINO_MAX_BUDGET_USD is ignored by the ${selected} harness (it bounds tokens)`);
+}
+
 // llm tunes the built-in default; a selected harness replaces it. Passing
 // both is rejected, so send exactly one.
 const analytics = new Analytics({
   infino: { uri: INFINO_URI },
   ...(harness
     ? { harness }
-    : { llm: { model: process.env.FINO_MODEL }, domainContext: DOMAIN_CONTEXT }),
+    : {
+        llm: {
+          model: process.env.FINO_MODEL,
+          maxTurns: MAX_TURNS,
+          maxBudgetUsd: numberEnv("FINO_MAX_BUDGET_USD"),
+        },
+        domainContext: DOMAIN_CONTEXT,
+      }),
   storage,
 });
 

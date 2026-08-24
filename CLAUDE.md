@@ -19,9 +19,12 @@ The server needs `INFINO_URI` (https://<host>/<database>), `INFINO_API_KEY`,
 and `ANTHROPIC_API_KEY`. Optional: `FINO_MODEL`, `FINO_DB` (SQLite path),
 `FINO_SUGGESTIONS` (pipe-separated question chips), `FINO_DOMAIN_CONTEXT`
 (operator notes about the dataset, appended to the agent's system prompt),
+`FINO_MAX_TURNS` / `FINO_MAX_BUDGET_USD` (per-question agent ceilings),
 `PORT`. `FINO_HARNESS=openai` swaps in the OpenAI harness, which needs
 `OPENAI_BASE_URL`, `OPENAI_API_KEY`, and `OPENAI_MODEL` instead of
-`ANTHROPIC_API_KEY`; `FINO_DOMAIN_CONTEXT` applies to either.
+`ANTHROPIC_API_KEY`. `FINO_DOMAIN_CONTEXT` and `FINO_MAX_TURNS` apply to
+either harness; `FINO_MAX_BUDGET_USD` only to Claude, which is the one that
+bills in dollars.
 
 `npm test` covers the pure logic (filters, execute/binding, mergePatch,
 toEChartsOption, the ask() seam, the OpenAI stream mapper and turn loop) plus
