@@ -11,11 +11,13 @@ import { connectInfinoMcp } from "./mcp.js";
 import { runTurns, type LoopStats, type StreamFn } from "./loop.js";
 import { buildToolRegistry } from "./tools.js";
 
-// A second harness behind the same ChatEvent contract: GPT-5 on Azure AI
-// Foundry's Responses API, with the Infino data tools over MCP.
+// A second harness behind the same ChatEvent contract: the OpenAI Responses
+// API, with the Infino data tools over MCP. Any deployment that speaks it
+// works — api.openai.com or an Azure OpenAI / AI Foundry resource — because
+// the only thing that varies is baseURL.
 //
 // Deliberate differences from the Claude harness, all invisible to consumers:
-//   - `done.costUsd` is omitted. Azure reports tokens, not cost, and a
+//   - `done.costUsd` is omitted. The API reports tokens, not cost, and a
 //     hardcoded price table rots; the ceiling is maxTotalTokens instead.
 //   - No `summary` event. The Responses API has no second copy of the final
 //     text, so a summary would only duplicate the last `progress`.
@@ -27,16 +29,16 @@ const DEFAULT_MAX_TURNS = 25;
 const DEFAULT_MAX_TOTAL_TOKENS = 400_000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 300_000;
 
-export interface FoundryConfig {
+export interface OpenAIConfig {
   infino: InfinoConfig;
-  /** Azure OpenAI resource base; "openai/v1" is appended. Falls back to
-   * FOUNDRY_OPENAI_ENDPOINT. */
-  endpoint?: string;
-  /** Falls back to FOUNDRY_API_KEY. Sent as a bearer token — the v1 surface
-   * takes no api-version. */
+  /** Full API base, no path building. Falls back to OPENAI_BASE_URL.
+   *   OpenAI: https://api.openai.com/v1
+   *   Azure:  https://<resource>.openai.azure.com/openai/v1 */
+  baseURL?: string;
+  /** Falls back to OPENAI_API_KEY. Sent as a bearer token; the v1 surface
+   * takes no api-version, on Azure either. */
   apiKey?: string;
-  /** Deployment name, not a catalog model id. Falls back to
-   * FOUNDRY_OPENAI_MODEL. */
+  /** Model id, or an Azure deployment name. Falls back to OPENAI_MODEL. */
   model?: string;
   maxTurns?: number;
   /** Cumulative billed tokens per question (default 400k). */
@@ -48,34 +50,31 @@ export interface FoundryConfig {
 /** The two provider boundaries, injectable so the conformance suite can drive
  * the real harness without an endpoint or a child process. Production passes
  * neither. */
-export interface FoundrySeams {
+export interface OpenAISeams {
   /** Replaces the streaming Responses call. */
   stream?: StreamFn;
   /** Replaces the stdio MCP connection. */
   connectMcp?: typeof connectInfinoMcp;
 }
 
-/** Build the Foundry harness. Model configuration is closed over here, so
- * the facade only ever sees the AgentHarness signature. */
-export function createFoundryHarness(config: FoundryConfig, seams: FoundrySeams = {}): AgentHarness {
-  const model = required(config.model ?? process.env.FOUNDRY_OPENAI_MODEL, "FOUNDRY_OPENAI_MODEL");
+/** Build the OpenAI harness. Model configuration is closed over here, so the
+ * facade only ever sees the AgentHarness signature. */
+export function createOpenAIHarness(config: OpenAIConfig, seams: OpenAISeams = {}): AgentHarness {
+  const model = required(config.model ?? process.env.OPENAI_MODEL, "OPENAI_MODEL");
   const connect = seams.connectMcp ?? connectInfinoMcp;
 
   // The plain client, not AzureOpenAI: that one injects an api-version and
-  // rewrites paths for deployment-scoped routes, which /openai/v1 rejects.
+  // rewrites paths for deployment-scoped routes, which the v1 surface rejects.
   // Skipped entirely when the caller supplies its own stream.
   const client = seams.stream
     ? undefined
     : new OpenAI({
-        baseURL: new URL(
-          "openai/v1",
-          withTrailingSlash(required(config.endpoint ?? process.env.FOUNDRY_OPENAI_ENDPOINT, "FOUNDRY_OPENAI_ENDPOINT")),
-        ).toString(),
-        apiKey: required(config.apiKey ?? process.env.FOUNDRY_API_KEY, "FOUNDRY_API_KEY"),
+        baseURL: required(config.baseURL ?? process.env.OPENAI_BASE_URL, "OPENAI_BASE_URL"),
+        apiKey: required(config.apiKey ?? process.env.OPENAI_API_KEY, "OPENAI_API_KEY"),
         timeout: config.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
       });
 
-  return async function* foundryHarness(params) {
+  return async function* openaiHarness(params) {
     const abort = new AbortController();
     if (params.signal) {
       if (params.signal.aborted) abort.abort();
@@ -161,15 +160,12 @@ function isStaleResponseId(err: unknown): boolean {
 
 function describe(err: unknown): string {
   // Azure surfaces content-filter blocks as a 400 rather than a stream event.
+  // Treated the same as any other API error.
   if (err instanceof APIError) {
     const code = typeof err.code === "string" ? err.code : String(err.status);
     return `agent stopped: ${code}${err.message ? ` — ${err.message.slice(0, 300)}` : ""}`;
   }
   return err instanceof Error ? err.message : String(err);
-}
-
-function withTrailingSlash(url: string): string {
-  return url.endsWith("/") ? url : `${url}/`;
 }
 
 function required(value: string | undefined, name: string): string {

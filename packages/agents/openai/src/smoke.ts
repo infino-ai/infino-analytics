@@ -2,9 +2,9 @@
 // Not a unit test — it spends tokens and requires credentials:
 //
 //   set -a; source .env; set +a
-//   npm run smoke -w @infino-ai/analytics-agent-foundry
+//   npm run smoke -w @infino-ai/analytics-agent-openai
 import { connectInfinoMcp } from "./mcp.js";
-import { createFoundryHarness } from "./index.js";
+import { createOpenAIHarness } from "./index.js";
 
 const uri = process.env.INFINO_URI;
 if (!uri) throw new Error("INFINO_URI is not set");
@@ -21,9 +21,9 @@ try {
   await mcp.close();
 }
 
-const harness = createFoundryHarness({ infino: { uri } });
+const harness = createOpenAIHarness({ infino: { uri } });
 for await (const event of harness({ question: "Which tables exist? Answer in one sentence." })) {
   if (event.type === "step") console.log(`     step: ${event.tool}`);
-  if (event.type === "progress") console.log(`FOUNDRY ok — ${event.text.slice(0, 200)}`);
-  if (event.type === "error") console.error(`FOUNDRY FAILED — ${event.message}`);
+  if (event.type === "progress") console.log(`OPENAI ok — ${event.text.slice(0, 200)}`);
+  if (event.type === "error") console.error(`OPENAI FAILED — ${event.message}`);
 }

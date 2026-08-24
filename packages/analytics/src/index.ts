@@ -1,4 +1,4 @@
-import { createClaudeHarness } from "@infino-ai/analytics-agent";
+import { createClaudeHarness } from "@infino-ai/analytics-agent-claude";
 import {
   DashboardSchema,
   InMemoryStorage,

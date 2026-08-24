@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import type { ResponseStreamEvent } from "openai/resources/responses/responses";
 import { createTurnMapper } from "../src/stream.js";
 
-// Event shapes captured verbatim from the live Foundry endpoint, so a change
+// Event shapes captured verbatim from a live Responses endpoint, so a change
 // on their side shows up here rather than in production.
 const ev = (e: unknown) => e as ResponseStreamEvent;
 

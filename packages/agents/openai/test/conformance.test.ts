@@ -1,9 +1,9 @@
 import { assertHarnessConformance } from "@infino-ai/analytics-core/conformance";
 import type { ResponseStreamEvent } from "openai/resources/responses/responses";
-import { createFoundryHarness } from "../src/index.js";
+import { createOpenAIHarness } from "../src/index.js";
 import type { McpToolset } from "../src/mcp.js";
 
-// Fixtures for the REAL createFoundryHarness — both provider boundaries are
+// Fixtures for the REAL createOpenAIHarness — both provider boundaries are
 // stubbed, so this exercises the shipped abort/error/done semantics rather
 // than a lookalike.
 const ev = (e: unknown) => e as ResponseStreamEvent;
@@ -30,7 +30,7 @@ const fakeMcp: McpToolset = {
 
 function harness(turns: ResponseStreamEvent[][], fail = false) {
   let served = 0;
-  return createFoundryHarness(
+  return createOpenAIHarness(
     { infino: { uri: "https://example.test/db", apiKey: "test" }, model: "test-model" },
     {
       connectMcp: async () => fakeMcp,
@@ -46,7 +46,7 @@ function harness(turns: ResponseStreamEvent[][], fail = false) {
   );
 }
 
-assertHarnessConformance("foundry", {
+assertHarnessConformance("openai", {
   answersText: () => harness([TEXT_TURN]),
   callsTool: () => harness([TOOL_TURN, TEXT_TURN]),
   providerFails: () => harness([], true),

@@ -6,6 +6,7 @@
   "type": "module",
   "workspaces": [
     "packages/*",
+    "packages/agents/*",
     "apps/*"
   ],
   "engines": {
@@ -18,7 +19,7 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p apps/web/tsconfig.json",
-    "test": "node --import tsx --test \"packages/*/test/**/*.test.ts\"",
+    "test": "node --import tsx --test \"packages/**/test/**/*.test.ts\"",
     "build": "npm run build -w @infino-ai/analytics-web",
     "dev": "npm run build -w @infino-ai/analytics-web && npm run dev -w @infino-ai/analytics-server"
   },

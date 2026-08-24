@@ -20,8 +20,8 @@ you already own:
 
 - **LLM seam** — the agent harness is a thin layer (Claude Agent SDK by
   default). Replace it with your own model loop; the tools, chart
-  contract, and persistence API don't change. `packages/agent-foundry`
-  (GPT-5 on Azure AI Foundry) is a second harness proving the seam.
+  contract, and persistence API don't change. `packages/agents/` holds the
+  worked examples — one Claude, one OpenAI — as peers behind one contract.
 - **Storage seam** — threads, visualizations, and dashboards persist
   through a `StorageAdapter` interface (SQLite by default). Implement it
   over your own database.
@@ -46,8 +46,8 @@ INFINO_API_KEY=... ANTHROPIC_API_KEY=... npm run dev
 # → http://localhost:8787
 # Optional: FINO_SUGGESTIONS="q1|q2|q3" sets the suggested-question chips
 # for your dataset; without it, generic suggestions are shown.
-# Optional: FINO_HARNESS=foundry runs GPT-5 on Azure AI Foundry instead of
-# Claude — see the FOUNDRY_* block in .env.example.
+# Optional: FINO_HARNESS=openai runs the OpenAI Responses API instead of
+# Claude — see the OPENAI_* block in .env.example.
 ```
 
 Or use the facade directly in your own code:
@@ -67,9 +67,9 @@ for await (const event of analytics.ask("which features have the most denials?")
 ingestion/                example data-loading scripts (run once, before chat)
 packages/analytics-core   the contract layer: VizSpec, ChatEvent, StorageAdapter,
                           execute() → { columns, rows, binding, warnings } — no LLM
-packages/agent            the default LLM harness (Claude Agent SDK) + tool policy
-packages/agent-foundry    a second harness: GPT-5 on Azure AI Foundry over MCP;
-                          proof that anything yielding ChatEvents fits the seam
+packages/agents/claude    the default harness (Claude Agent SDK) + tool policy
+packages/agents/openai    the OpenAI Responses API over MCP; any compatible
+                          deployment (api.openai.com, Azure OpenAI / Foundry)
 packages/storage-sqlite   the reference StorageAdapter: app state in one SQLite file
 packages/analytics        the facade: new Analytics({...}) — ask() + threads (Fino),
                           visualizations + dashboards (persistence API) on one client
@@ -101,8 +101,9 @@ The intended path, in the order most forks take it:
 4. **Swap the LLM harness if you need to.** Write an `AgentHarness` — any
    generator of `ChatEvent`s — and pass it as `new Analytics({harness})`.
    The contract layer (`packages/analytics-core`) and everything above it
-   stay untouched. `packages/agent-foundry` is the worked example; run it
-   with `FINO_HARNESS=foundry`.
+   stay untouched. `packages/agents/openai` is the worked example; run it
+   with `FINO_HARNESS=openai`. A new harness must pass
+   `assertHarnessConformance` — the contract's executable spec.
 5. **Put your gateway in front.** The reference server ships without
    auth on purpose.
 
@@ -116,6 +117,6 @@ persistent threads (transcripts survive restarts, reopened threads resume
 the model's context), and the visualization/dashboard persistence API:
 saved charts with runtime filter/time-range injection at execute,
 dashboards referencing them by id, stable REST shapes over HTTP. Two
-interchangeable harnesses (Claude, and GPT-5 on Azure AI Foundry) run the
-same UI unchanged.
+interchangeable harnesses (Claude, and the OpenAI Responses API) run the same
+UI unchanged, both held to one conformance suite.
 All of it on the same StorageAdapter.

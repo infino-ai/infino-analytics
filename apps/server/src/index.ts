@@ -58,8 +58,8 @@ const storage = new SqliteStorage({ path: process.env.FINO_DB ?? "./data/analyti
 const INFINO_URI = requireEnv("INFINO_URI");
 
 const HARNESSES: Record<string, () => Promise<AgentHarness>> = {
-  foundry: async () =>
-    (await import("@infino-ai/analytics-agent-foundry")).createFoundryHarness({
+  openai: async () =>
+    (await import("@infino-ai/analytics-agent-openai")).createOpenAIHarness({
       infino: { uri: INFINO_URI },
     }),
 };

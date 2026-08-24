@@ -33,7 +33,7 @@ export async function connectInfinoMcp(opts: McpOptions): Promise<McpToolset> {
     env: { INFINO_MCP_URI: opts.databaseUri, INFINO_API_KEY: opts.apiKey },
     stderr: "pipe",
   });
-  const client = new Client({ name: "fino-foundry", version: "0.0.0" });
+  const client = new Client({ name: "fino-openai", version: "0.0.0" });
   await client.connect(transport);
 
   try {
