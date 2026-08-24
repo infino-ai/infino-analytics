@@ -1,4 +1,4 @@
-import { deepStrictEqual, ok, rejects, strictEqual } from "node:assert/strict";
+import { deepStrictEqual, ok, rejects, strictEqual, throws } from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { AgentHarness, ChatEvent, StoredMessage } from "@infino-ai/analytics-core";
 import { Analytics } from "../src/index.js";
@@ -31,6 +31,29 @@ const drain = async (gen: AsyncGenerator<ChatEvent>) => {
 
 const assistantEvents = (messages: StoredMessage[]) =>
   messages.flatMap((m) => (m.role === "assistant" ? m.events : []));
+
+describe("Analytics config", () => {
+  it("accepts a harness alone", () => {
+    analytics(fakeHarness([]));
+  });
+
+  it("accepts llm alone", () => {
+    new Analytics({ infino: { uri: "https://example.test/db", apiKey: "test" }, llm: { model: "x" } });
+  });
+
+  // Silently ignoring one of them is how a deployment runs the wrong model.
+  it("refuses both llm and harness", () => {
+    throws(
+      () =>
+        new Analytics({
+          infino: { uri: "https://example.test/db", apiKey: "test" },
+          llm: { model: "x" },
+          harness: fakeHarness([]),
+        }),
+      /either llm .* or harness .* not both/,
+    );
+  });
+});
 
 describe("Analytics.ask", () => {
   it("yields every harness event in order", async () => {

@@ -64,12 +64,13 @@ export interface AnalyticsConfig {
   /** Infino target: hosted https://<host>/<database>. The apiKey falls back
    * to INFINO_API_KEY. */
   infino: { uri: string; apiKey?: string };
-  /** LLM seam — needed only for the conversational surface (ask). The
-   * visualization/dashboard surfaces never touch it. Default harness is the
-   * Claude Agent SDK; the key falls back to ANTHROPIC_API_KEY. */
-  llm?: { model?: string; anthropicApiKey?: string; maxBudgetUsd?: number };
-  /** LLM harness override. Defaults to the Claude Agent SDK built from
-   * `llm`; pass any generator of ChatEvents to run a different model. */
+  /** Tuning for the BUILT-IN default harness (Claude Agent SDK) — needed only
+   * by the conversational surface; the visualization/dashboard surfaces never
+   * touch it. Mutually exclusive with `harness`, which replaces the default
+   * outright. The key falls back to ANTHROPIC_API_KEY. */
+  llm?: { model?: string; apiKey?: string; maxBudgetUsd?: number };
+  /** Replace the LLM entirely: any generator of ChatEvents. Peer harnesses
+   * live in `packages/agents/`. */
   harness?: AgentHarness;
   /** Storage seam. Defaults to InMemoryStorage (nothing survives a
    * restart); pass SqliteStorage or your own StorageAdapter for
@@ -170,12 +171,19 @@ export class Analytics {
   readonly dashboards: Dashboards;
 
   constructor(config: AnalyticsConfig) {
+    // Silently dropping one of these is how a deployment ends up running a
+    // model nobody configured. Refuse instead.
+    if (config.harness && config.llm) {
+      throw new Error(
+        "pass either llm (tunes the built-in Claude harness) or harness (replaces it), not both",
+      );
+    }
     this.harness =
       config.harness ??
       createClaudeHarness({
         infino: config.infino,
         model: config.llm?.model,
-        anthropicApiKey: config.llm?.anthropicApiKey,
+        anthropicApiKey: config.llm?.apiKey,
         maxBudgetUsd: config.llm?.maxBudgetUsd,
       });
     this.storage = config.storage ?? new InMemoryStorage();

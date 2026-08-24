@@ -29,7 +29,7 @@ Consumers only ever need this package; the types below are re-exported from it.
 |---|---|
 | An Infino database | Infino Cloud (`https://api.platform.infino.ws/<database>`) with your data already ingested (see `ingestion/` at the repo root for example loaders) |
 | Infino API key | `config.infino.apiKey`, or the `INFINO_API_KEY` environment variable |
-| Anthropic API key | `config.llm.anthropicApiKey`, or `ANTHROPIC_API_KEY`. Needed only for `ask()`; the visualization API never touches an LLM |
+| An LLM credential | `config.llm.apiKey`, or `ANTHROPIC_API_KEY` for the default harness. Needed only for `ask()`; the visualization API never touches an LLM |
 
 ## Configuration
 
@@ -41,13 +41,38 @@ new Analytics(config: AnalyticsConfig)
 |---|---|---|---|
 | `infino.uri` | `string` | required | Database URI: `https://<host>/<database>` |
 | `infino.apiKey` | `string?` | `INFINO_API_KEY` | Bearer key for the database |
-| `llm.model` | `string?` | `claude-opus-5` | Anthropic model id used by the default harness |
-| `llm.anthropicApiKey` | `string?` | `ANTHROPIC_API_KEY` | LLM credential |
+| `llm.model` | `string?` | `claude-opus-5` | Model id for the built-in harness |
+| `llm.apiKey` | `string?` | `ANTHROPIC_API_KEY` | Credential for the built-in harness |
 | `llm.maxBudgetUsd` | `number?` | `2` | Hard spend ceiling per question; the run stops with an `error` event if it would exceed this |
+| `harness` | `AgentHarness?` | Claude Agent SDK | Replaces the LLM entirely — any generator of `ChatEvent`s. See Swapping the harness below |
 | `storage` | `StorageAdapter?` | `InMemoryStorage` | Where threads live. Pass `SqliteStorage` (from `@infino-ai/analytics-storage-sqlite`) or your own adapter; see Threads and persistence below |
 
 `llm` as a whole is optional: leave it out entirely if a deployment only uses
 the non-conversational surfaces.
+
+`llm` and `harness` are **mutually exclusive** — `llm` tunes the built-in
+harness, `harness` replaces it, so passing both throws at construction rather
+than silently ignoring one.
+
+> **Breaking change:** `llm.anthropicApiKey` is now `llm.apiKey`. The facade is
+> provider-neutral; the provider is whichever harness you run.
+
+## Swapping the harness
+
+```ts
+import { createOpenAIHarness } from "@infino-ai/analytics-agent-openai";
+
+const analytics = new Analytics({
+  infino: { uri },
+  harness: createOpenAIHarness({ infino: { uri } }),
+});
+```
+
+An `AgentHarness` is `(params) => AsyncGenerator<ChatEvent, {sessionId?}>` and
+nothing more. Writing your own: implement that, reuse `buildSystemPrompt`,
+`runCreateChart`, `stepDetail`, and `drain` from `@infino-ai/analytics-core`,
+and assert it with `assertHarnessConformance` from
+`@infino-ai/analytics-core/conformance`.
 
 ## Methods
 

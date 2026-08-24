@@ -72,10 +72,11 @@ if (selected && !(selected in HARNESSES)) {
 // Unselected → undefined → the facade's built-in default.
 const harness = selected ? await HARNESSES[selected]() : undefined;
 
+// llm tunes the built-in default; a selected harness replaces it. Passing
+// both is rejected, so send exactly one.
 const analytics = new Analytics({
   infino: { uri: INFINO_URI },
-  llm: { model: process.env.FINO_MODEL },
-  harness,
+  ...(harness ? { harness } : { llm: { model: process.env.FINO_MODEL } }),
   storage,
 });
 
