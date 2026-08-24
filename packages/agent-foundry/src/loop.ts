@@ -3,7 +3,7 @@ import type {
   ResponseInput,
   ResponseStreamEvent,
 } from "openai/resources/responses/responses";
-import type { ChatEvent } from "@infino-ai/analytics-core";
+import { drain, type ChatEvent } from "@infino-ai/analytics-core";
 import { createTurnMapper } from "./stream.js";
 import type { ToolRegistry } from "./tools.js";
 
@@ -92,6 +92,3 @@ export async function* runTurns(o: LoopOptions): AsyncGenerator<ChatEvent, { ses
   }
 }
 
-function* drain(queue: ChatEvent[]): Generator<ChatEvent> {
-  while (queue.length > 0) yield queue.shift() as ChatEvent;
-}

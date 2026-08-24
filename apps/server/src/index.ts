@@ -32,8 +32,7 @@ import { join, dirname, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
-import { Analytics } from "@infino-ai/analytics";
-import { createFoundryHarness } from "@infino-ai/analytics-agent-foundry";
+import { Analytics, type AgentHarness } from "@infino-ai/analytics";
 import { SqliteStorage } from "@infino-ai/analytics-storage-sqlite";
 
 const PORT = Number(process.env.PORT ?? 8787);
@@ -52,15 +51,29 @@ function requireEnv(name: string): string {
 // below; the reference implementation is a local SQLite file.
 const storage = new SqliteStorage({ path: process.env.FINO_DB ?? "./data/analytics.db" });
 
-// The LLM seam, wired: the app picks the harness so the facade keeps only
-// its Claude default and never pulls a second provider's SDK.
-const harness =
-  process.env.FINO_HARNESS === "foundry"
-    ? createFoundryHarness({ infino: { uri: requireEnv("INFINO_URI") } })
-    : undefined;
+// The LLM seam, wired: the app picks the harness, so the facade keeps only
+// its Claude default and never pulls a second provider's SDK. Imports are
+// dynamic so an unselected harness costs nothing at boot — adding one is a
+// single entry here.
+const INFINO_URI = requireEnv("INFINO_URI");
+
+const HARNESSES: Record<string, () => Promise<AgentHarness>> = {
+  foundry: async () =>
+    (await import("@infino-ai/analytics-agent-foundry")).createFoundryHarness({
+      infino: { uri: INFINO_URI },
+    }),
+};
+
+const selected = process.env.FINO_HARNESS;
+if (selected && !(selected in HARNESSES)) {
+  console.error(`FINO_HARNESS=${selected} is unknown (have: ${Object.keys(HARNESSES).join(", ")})`);
+  process.exit(1);
+}
+// Unselected → undefined → the facade's built-in default.
+const harness = selected ? await HARNESSES[selected]() : undefined;
 
 const analytics = new Analytics({
-  infino: { uri: requireEnv("INFINO_URI") },
+  infino: { uri: INFINO_URI },
   llm: { model: process.env.FINO_MODEL },
   harness,
   storage,

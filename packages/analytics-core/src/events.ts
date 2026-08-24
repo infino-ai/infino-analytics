@@ -14,12 +14,6 @@ export type ChatEvent =
   | { type: "delta"; text: string } // streamed text chunk; superseded by the next progress/summary
   | { type: "progress"; text: string }
   | { type: "sql"; query: string }
-  | {
-      type: "data";
-      columns: { name: string; type: string }[];
-      rows: Record<string, unknown>[];
-      truncated: boolean;
-    }
   | { type: "chart"; spec: VizSpec; result: ExecuteResult }
   | { type: "summary"; text: string }
   | { type: "error"; message: string }
@@ -47,4 +41,11 @@ export function stepDetail(input: Record<string, unknown> | undefined): string |
     (Object.keys(input).length ? JSON.stringify(input) : undefined);
   if (!detail) return undefined;
   return detail.length > STEP_DETAIL_MAX ? `${detail.slice(0, STEP_DETAIL_MAX)}…` : detail;
+}
+
+/** Flush a harness's side-channel queue into its outbound stream. Tools push
+ * full result rows here so they reach the UI without entering model context;
+ * a harness drains around every await. */
+export function* drain(queue: ChatEvent[]): Generator<ChatEvent> {
+  while (queue.length > 0) yield queue.shift() as ChatEvent;
 }

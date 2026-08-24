@@ -14,7 +14,7 @@ export type {
   ExecuteResult,
 } from "./spec.js";
 export type { ChatEvent } from "./events.js";
-export { stepDetail } from "./events.js";
+export { drain, stepDetail } from "./events.js";
 export type { AgentHarness, HarnessRunParams, HarnessRunResult } from "./harness.js";
 export { InfinoClient } from "./client.js";
 export type { InfinoConfig } from "./client.js";

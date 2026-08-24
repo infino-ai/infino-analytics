@@ -2,6 +2,7 @@ import { createRequire } from "node:module";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import {
   InfinoClient,
+  drain,
   stepDetail,
   type AgentHarness,
   type InfinoConfig,
@@ -76,8 +77,9 @@ export interface AgentRunResult {
 }
 
 /** Run one question through the agent, yielding typed events. Returns the
- * SDK session id so a follow-up can resume the conversation. */
-export async function* runAgent(params: {
+ * SDK session id so a follow-up can resume the conversation. Internal:
+ * consumers go through createClaudeHarness. */
+async function* runAgent(params: {
   question: string;
   config: AgentConfig;
   resumeSessionId?: string;
@@ -246,7 +248,4 @@ export function createClaudeHarness(config: AgentConfig): AgentHarness {
   return (params) => runAgent({ ...params, config });
 }
 
-function* drain(queue: ChatEvent[]): Generator<ChatEvent> {
-  while (queue.length > 0) yield queue.shift() as ChatEvent;
-}
 

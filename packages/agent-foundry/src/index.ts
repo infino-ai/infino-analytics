@@ -1,6 +1,7 @@
 import OpenAI, { APIError } from "openai";
 import {
   InfinoClient,
+  drain,
   type AgentHarness,
   type ChatEvent,
   type InfinoConfig,
@@ -75,9 +76,16 @@ export function createFoundryHarness(config: FoundryConfig): AgentHarness {
       databaseUri: infino.databaseUri,
       apiKey: config.infino.apiKey ?? process.env.INFINO_API_KEY ?? "",
     });
-    // Abort closes the child directly: a consumer that abandons this
-    // generator never reaches the finally below.
-    abort.signal.addEventListener("abort", () => void mcp.close().catch(() => {}), { once: true });
+    // Two teardown paths, one close: the finally below covers normal and
+    // error exits, while abort covers a consumer that abandons this generator
+    // and so never reaches it.
+    let closed = false;
+    const closeOnce = async () => {
+      if (closed) return;
+      closed = true;
+      await mcp.close().catch(() => {});
+    };
+    abort.signal.addEventListener("abort", () => void closeOnce(), { once: true });
 
     // A stored response expires (~30 days) and a reopened thread then points
     // at nothing. Dropping the pointer restarts the conversation, which the
@@ -120,16 +128,13 @@ export function createFoundryHarness(config: FoundryConfig): AgentHarness {
       }
       yield { type: "done", sessionId: sessionId ?? "", turns: stats.turns };
     } finally {
-      await mcp.close().catch(() => {});
+      await closeOnce();
     }
 
     return { sessionId };
   };
 }
 
-function* drain(queue: ChatEvent[]): Generator<ChatEvent> {
-  while (queue.length > 0) yield queue.shift() as ChatEvent;
-}
 
 /** A previous_response_id the provider no longer knows about. */
 function isStaleResponseId(err: unknown): boolean {
