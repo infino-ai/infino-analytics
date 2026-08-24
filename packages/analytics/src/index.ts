@@ -1,6 +1,7 @@
 import { createClaudeHarness } from "@infino-ai/analytics-agent-claude";
 import {
   DashboardSchema,
+  FilterSchema,
   InMemoryStorage,
   InfinoClient,
   NewDashboardSchema,
@@ -273,6 +274,13 @@ export class Analytics {
 
 // ── the persistence surfaces ───────────────────────────────────────────────
 
+/** Saved filters were parsed on write; request filters arrive straight from a
+ * caller or the HTTP boundary. An unknown operator has to fail here — reaching
+ * the SQL builder turns it into a misleading sql_parse_error receipt. */
+function parseRequestFilters(filters: Filter[] | undefined): Filter[] | undefined {
+  return filters?.map((f) => FilterSchema.parse(f));
+}
+
 function buildVisualizations(storage: StorageAdapter, client: InfinoClient): Visualizations {
   const store = storage.visualizations;
   return {
@@ -316,7 +324,7 @@ function buildVisualizations(storage: StorageAdapter, client: InfinoClient): Vis
       }
       return execute(client, spec, {
         savedFilters: spec.filters,
-        filters: opts.filters,
+        filters: parseRequestFilters(opts.filters),
         timeRange: opts.timeRange ?? spec.time_range,
       });
     },
@@ -373,7 +381,7 @@ function buildDashboards(storage: StorageAdapter, visualizations: Visualizations
     async execute(id, opts = {}) {
       const dash = await store.get(id);
       if (!dash) throw new Error(`unknown dashboard: ${id}`);
-      const filters = opts.filters ?? dash.filters;
+      const filters = parseRequestFilters(opts.filters) ?? dash.filters;
       const timeRange = opts.timeRange ?? dash.time_range;
 
       const resolve = async (panel: Dashboard["panels"][number]): Promise<DashboardPanelResult> => {
