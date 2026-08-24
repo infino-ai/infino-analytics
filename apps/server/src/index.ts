@@ -33,6 +33,7 @@ import { fileURLToPath } from "node:url";
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { Analytics } from "@infino-ai/analytics";
+import { createFoundryHarness } from "@infino-ai/analytics-agent-foundry";
 import { SqliteStorage } from "@infino-ai/analytics-storage-sqlite";
 
 const PORT = Number(process.env.PORT ?? 8787);
@@ -51,9 +52,17 @@ function requireEnv(name: string): string {
 // below; the reference implementation is a local SQLite file.
 const storage = new SqliteStorage({ path: process.env.FINO_DB ?? "./data/analytics.db" });
 
+// The LLM seam, wired: the app picks the harness so the facade keeps only
+// its Claude default and never pulls a second provider's SDK.
+const harness =
+  process.env.FINO_HARNESS === "foundry"
+    ? createFoundryHarness({ infino: { uri: requireEnv("INFINO_URI") } })
+    : undefined;
+
 const analytics = new Analytics({
   infino: { uri: requireEnv("INFINO_URI") },
   llm: { model: process.env.FINO_MODEL },
+  harness,
   storage,
 });
 
