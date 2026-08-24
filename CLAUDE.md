@@ -8,8 +8,9 @@ swaps and what it must preserve.
 ## Commands
 
 ```sh
-npm install
-npm run typecheck        # tsc across all packages + the web app
+npm install              # Node 22+
+npm run typecheck        # tsc across all packages, tests, and the web app
+npm test                 # node:test over the pure logic; no network
 npm run build            # bundles the web app (Vite)
 npm run dev              # builds web, starts the reference server on :8787
 ```
@@ -17,9 +18,15 @@ npm run dev              # builds web, starts the reference server on :8787
 The server needs `INFINO_URI` (https://<host>/<database>), `INFINO_API_KEY`,
 and `ANTHROPIC_API_KEY`. Optional: `FINO_MODEL`, `FINO_DB` (SQLite path),
 `FINO_SUGGESTIONS` (pipe-separated question chips), `PORT`.
+`FINO_HARNESS=foundry` swaps in the Azure harness, which needs
+`FOUNDRY_OPENAI_ENDPOINT`, `FOUNDRY_API_KEY`, and `FOUNDRY_OPENAI_MODEL`
+(a deployment name) instead of `ANTHROPIC_API_KEY`.
 
-There is no test suite; verification is `npm run typecheck`, a web build,
-and exercising the running server.
+`npm test` covers the pure logic (filters, execute/binding, mergePatch,
+toEChartsOption, the ask() seam, the Foundry stream mapper and turn loop) —
+no network, no credentials. Anything touching a provider is verified by
+`npm run smoke -w @infino-ai/analytics-agent-foundry` and by exercising the
+running server.
 
 ## Layout
 
@@ -29,6 +36,8 @@ packages/analytics-core     contract layer: VizSpec, ChatEvent, execute(),
                             the create_chart tool contract. No LLM SDK.
 packages/agent              the LLM harness (Claude Agent SDK): event loop,
                             tool policy, system prompt. Replaceable.
+packages/agent-foundry      second harness: GPT-5 on Azure AI Foundry, MCP
+                            client for the data tools. Selected by FINO_HARNESS.
 packages/storage-sqlite     reference StorageAdapter (one SQLite file)
 packages/analytics          the facade consumers install: Analytics class,
                             toEChartsOption. Depends on all of the above.
@@ -39,7 +48,10 @@ ingestion/                  example bulk loader (REST, run once)
 ```
 
 Dependency direction: `analytics -> agent -> analytics-core`, and the
-storage packages depend only on `analytics-core`. Never invert these.
+storage and alternative-harness packages depend only on `analytics-core`.
+Never invert these. `analytics` defaults to the Claude harness, so only the
+app picks a different one — that is what keeps a second provider's SDK out
+of the facade's dependency graph.
 
 ## Load-bearing contracts
 
@@ -69,6 +81,11 @@ Break any of these and consumers break with you.
   (`analytics-core/src/chart-tool.ts`) so its contract cannot drift.
 - **Storage is a seam.** Consumers type against `StorageAdapter` only; a
   new database is a new adapter package, not edits to consumers.
+- **The Foundry harness diverges deliberately** (`agent-foundry/src/index.ts`):
+  no `done.costUsd` (Azure bills tokens, not dollars — the ceiling is
+  `maxTotalTokens`), no `summary` event (the Responses API has no second copy
+  of the final text), and no web search. It also owns the MCP child process
+  the Claude SDK used to own, so every exit path must close it.
 - **Tool policy** (`agent/src/index.ts`): under `dontAsk`, `allowedTools`
   only auto-approves; `disallowedTools` is what actually blocks. Host-
   reaching tools (Bash, file I/O) stay denied because the server process

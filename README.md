@@ -20,7 +20,8 @@ you already own:
 
 - **LLM seam** — the agent harness is a thin layer (Claude Agent SDK by
   default). Replace it with your own model loop; the tools, chart
-  contract, and persistence API don't change.
+  contract, and persistence API don't change. `packages/agent-foundry`
+  (GPT-5 on Azure AI Foundry) is a second harness proving the seam.
 - **Storage seam** — threads, visualizations, and dashboards persist
   through a `StorageAdapter` interface (SQLite by default). Implement it
   over your own database.
@@ -29,6 +30,8 @@ you already own:
   between them.
 
 ## Quickstart
+
+Requires Node 22 or newer.
 
 ```sh
 npm install
@@ -43,6 +46,8 @@ INFINO_API_KEY=... ANTHROPIC_API_KEY=... npm run dev
 # → http://localhost:8787
 # Optional: FINO_SUGGESTIONS="q1|q2|q3" sets the suggested-question chips
 # for your dataset; without it, generic suggestions are shown.
+# Optional: FINO_HARNESS=foundry runs GPT-5 on Azure AI Foundry instead of
+# Claude — see the FOUNDRY_* block in .env.example.
 ```
 
 Or use the facade directly in your own code:
@@ -62,8 +67,9 @@ for await (const event of analytics.ask("which features have the most denials?")
 ingestion/                example data-loading scripts (run once, before chat)
 packages/analytics-core   the contract layer: VizSpec, ChatEvent, StorageAdapter,
                           execute() → { columns, rows, binding, warnings } — no LLM
-packages/agent            the LLM harness (Claude Agent SDK) + tools + prompts;
-                          replaceable: anything yielding ChatEvents fits the seam
+packages/agent            the default LLM harness (Claude Agent SDK) + tool policy
+packages/agent-foundry    a second harness: GPT-5 on Azure AI Foundry over MCP;
+                          proof that anything yielding ChatEvents fits the seam
 packages/storage-sqlite   the reference StorageAdapter: app state in one SQLite file
 packages/analytics        the facade: new Analytics({...}) — ask() + threads (Fino),
                           visualizations + dashboards (persistence API) on one client
@@ -90,11 +96,13 @@ The intended path, in the order most forks take it:
    `@infino-ai/analytics/echarts`) turns any executed visualization into a
    render plan; pass a theme to match your design system.
 3. **Swap the storage.** Implement `StorageAdapter` over your database and
-   pass it to `new Analytics({storage})`; the bundled SQLite and Infino
-   adapters are the worked examples.
-4. **Swap the LLM harness if you need to.** `packages/agent` is the seam:
-   anything that yields `ChatEvent`s fits. The contract layer
-   (`packages/analytics-core`) and everything above it stay untouched.
+   pass it to `new Analytics({storage})`; the bundled SQLite adapter is the
+   worked example.
+4. **Swap the LLM harness if you need to.** Write an `AgentHarness` — any
+   generator of `ChatEvent`s — and pass it as `new Analytics({harness})`.
+   The contract layer (`packages/analytics-core`) and everything above it
+   stay untouched. `packages/agent-foundry` is the worked example; run it
+   with `FINO_HARNESS=foundry`.
 5. **Put your gateway in front.** The reference server ships without
    auth on purpose.
 
@@ -107,5 +115,7 @@ Working: conversational analytics end to end (ask -> SQL -> chart) with
 persistent threads (transcripts survive restarts, reopened threads resume
 the model's context), and the visualization/dashboard persistence API:
 saved charts with runtime filter/time-range injection at execute,
-dashboards referencing them by id, stable REST shapes over HTTP.
+dashboards referencing them by id, stable REST shapes over HTTP. Two
+interchangeable harnesses (Claude, and GPT-5 on Azure AI Foundry) run the
+same UI unchanged.
 All of it on the same StorageAdapter.
