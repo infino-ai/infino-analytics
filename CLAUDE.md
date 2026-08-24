@@ -99,6 +99,31 @@ Break any of these and consumers break with you.
   `@infino-ai/analytics/echarts`. Keep `echarts.ts` free of Node built-ins
   and server imports.
 
+## Adding a harness
+
+Additive by construction: a new package plus one line of wiring. Nothing in
+`analytics-core`, `analytics`, `apps/web`, or the other harnesses changes.
+
+1. `packages/agents/<name>`, depending only on `@infino-ai/analytics-core`
+   (plus the provider SDK). Name it `@infino-ai/analytics-agent-<name>`.
+2. Export `create<Name>Harness(config): AgentHarness`. Map the provider's
+   stream to `ChatEvent`s; keep that mapping a pure function so it is testable
+   without a network.
+3. Reuse, do not re-derive: `buildSystemPrompt` (capability flags, not a second
+   copy), `runCreateChart`, `stepDetail`, `drain`.
+4. Honour the terminal semantics — abort yields `done` and never `error`; a
+   failure yields `error` then `done`.
+5. **Add `assertHarnessConformance("<name>", …)`** from
+   `@infino-ai/analytics-core/conformance`. Non-negotiable: it is the contract's
+   only executable definition. Give the provider boundary an injectable seam so
+   the suite can drive the real harness offline.
+6. One entry in `HARNESSES` in `apps/server/src/index.ts`, plus `.env.example`.
+
+Deliberately NOT abstracted, so nobody "fixes" it: the MCP client and the turn
+loop live in `agents/openai` alone. The Claude SDK owns its own loop and spawns
+MCP from config, so both are single-copy — extracting a one-consumer
+abstraction would be the smell, not the cure.
+
 ## Conventions
 
 - Packages export TypeScript source directly (`exports` maps to `src/`);
