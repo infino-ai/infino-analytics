@@ -86,6 +86,9 @@ async function* runAgent(params: {
   /** Abort cancels the underlying run (the model stops, tools stop) — not
    * just the event stream. Wire client disconnects to this. */
   signal?: AbortSignal;
+  /** The SDK call, injectable so the event mapping below can be tested
+   * without a provider. Production never passes this. */
+  queryFn?: QueryFn;
 }): AsyncGenerator<ChatEvent, AgentRunResult> {
   const client = new InfinoClient(params.config.infino);
 
@@ -109,7 +112,7 @@ async function* runAgent(params: {
   // track it so the summary isn't emitted twice.
   let lastAssistantText = "";
 
-  const messages = query({
+  const messages = (params.queryFn ?? query)({
     prompt: params.question,
     options: {
       model: params.config.model ?? DEFAULT_MODEL,
@@ -243,10 +246,14 @@ async function* runAgent(params: {
   return { sessionId };
 }
 
+/** The Agent SDK's entry point, as a type — the harness's only provider call
+ * and therefore its only test seam. */
+export type QueryFn = typeof query;
+
 /** Bind config to the harness seam. The facade holds one of these and never
- * names a model. */
-export function createClaudeHarness(config: AgentConfig): AgentHarness {
-  return (params) => runAgent({ ...params, config });
+ * names a model. `queryFn` is the conformance suite's injection point. */
+export function createClaudeHarness(config: AgentConfig, queryFn?: QueryFn): AgentHarness {
+  return (params) => runAgent({ ...params, config, queryFn });
 }
 
 

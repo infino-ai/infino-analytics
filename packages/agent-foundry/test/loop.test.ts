@@ -54,6 +54,7 @@ function harness(turns: ResponseStreamEvent[][], registry?: Partial<ToolRegistry
       stream,
       pending,
       stats,
+      signal: new AbortController().signal,
       ...over,
     });
   return { run, bodies, invoked, pending, stats };
@@ -204,6 +205,7 @@ describe("runTurns", () => {
       stream: () => Promise.reject(new Error("socket hang up")),
       pending: [],
       stats,
+      signal: new AbortController().signal,
     });
     await rejects(() => collect(gen), /socket hang up/);
   });

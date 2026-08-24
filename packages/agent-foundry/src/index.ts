@@ -45,20 +45,35 @@ export interface FoundryConfig {
   requestTimeoutMs?: number;
 }
 
+/** The two provider boundaries, injectable so the conformance suite can drive
+ * the real harness without an endpoint or a child process. Production passes
+ * neither. */
+export interface FoundrySeams {
+  /** Replaces the streaming Responses call. */
+  stream?: StreamFn;
+  /** Replaces the stdio MCP connection. */
+  connectMcp?: typeof connectInfinoMcp;
+}
+
 /** Build the Foundry harness. Model configuration is closed over here, so
  * the facade only ever sees the AgentHarness signature. */
-export function createFoundryHarness(config: FoundryConfig): AgentHarness {
-  const endpoint = required(config.endpoint ?? process.env.FOUNDRY_OPENAI_ENDPOINT, "FOUNDRY_OPENAI_ENDPOINT");
-  const apiKey = required(config.apiKey ?? process.env.FOUNDRY_API_KEY, "FOUNDRY_API_KEY");
+export function createFoundryHarness(config: FoundryConfig, seams: FoundrySeams = {}): AgentHarness {
   const model = required(config.model ?? process.env.FOUNDRY_OPENAI_MODEL, "FOUNDRY_OPENAI_MODEL");
+  const connect = seams.connectMcp ?? connectInfinoMcp;
 
   // The plain client, not AzureOpenAI: that one injects an api-version and
   // rewrites paths for deployment-scoped routes, which /openai/v1 rejects.
-  const client = new OpenAI({
-    baseURL: new URL("openai/v1", withTrailingSlash(endpoint)).toString(),
-    apiKey,
-    timeout: config.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
-  });
+  // Skipped entirely when the caller supplies its own stream.
+  const client = seams.stream
+    ? undefined
+    : new OpenAI({
+        baseURL: new URL(
+          "openai/v1",
+          withTrailingSlash(required(config.endpoint ?? process.env.FOUNDRY_OPENAI_ENDPOINT, "FOUNDRY_OPENAI_ENDPOINT")),
+        ).toString(),
+        apiKey: required(config.apiKey ?? process.env.FOUNDRY_API_KEY, "FOUNDRY_API_KEY"),
+        timeout: config.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
+      });
 
   return async function* foundryHarness(params) {
     const abort = new AbortController();
@@ -72,7 +87,7 @@ export function createFoundryHarness(config: FoundryConfig): AgentHarness {
     const stats: LoopStats = { turns: 0, totalTokens: 0 };
     let sessionId = params.resumeSessionId;
 
-    const mcp = await connectInfinoMcp({
+    const mcp = await connect({
       databaseUri: infino.databaseUri,
       apiKey: config.infino.apiKey ?? process.env.INFINO_API_KEY ?? "",
     });
@@ -90,17 +105,17 @@ export function createFoundryHarness(config: FoundryConfig): AgentHarness {
     // A stored response expires (~30 days) and a reopened thread then points
     // at nothing. Dropping the pointer restarts the conversation, which the
     // thread contract already allows; the transcript still renders.
-    const stream: StreamFn = async (body) => {
-      try {
-        return await client.responses.create(body, { signal: abort.signal });
-      } catch (err) {
-        if (!body.previous_response_id || !isStaleResponseId(err)) throw err;
-        return client.responses.create(
-          { ...body, previous_response_id: undefined },
-          { signal: abort.signal },
-        );
-      }
-    };
+    const stream: StreamFn =
+      seams.stream ??
+      (async (body, { signal }) => {
+        const api = client as OpenAI;
+        try {
+          return await api.responses.create(body, { signal });
+        } catch (err) {
+          if (!body.previous_response_id || !isStaleResponseId(err)) throw err;
+          return api.responses.create({ ...body, previous_response_id: undefined }, { signal });
+        }
+      });
 
     try {
       const result = yield* runTurns({
@@ -116,6 +131,7 @@ export function createFoundryHarness(config: FoundryConfig): AgentHarness {
         stream,
         pending,
         stats,
+        signal: abort.signal,
       });
       sessionId = result.sessionId ?? sessionId;
       yield* drain(pending);

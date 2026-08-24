@@ -10,7 +10,10 @@ import type { ToolRegistry } from "./tools.js";
 // The bounded turn loop. Every provider call goes through the injected
 // `stream`, so the whole loop runs in a unit test with no network.
 
-export type StreamFn = (body: ResponseCreateParamsStreaming) => Promise<AsyncIterable<ResponseStreamEvent>>;
+export type StreamFn = (
+  body: ResponseCreateParamsStreaming,
+  opts: { signal: AbortSignal },
+) => Promise<AsyncIterable<ResponseStreamEvent>>;
 
 export interface LoopStats {
   turns: number;
@@ -32,6 +35,7 @@ export interface LoopOptions {
   pending: ChatEvent[];
   /** Mutated as the run proceeds, so the caller can report turns after a throw. */
   stats: LoopStats;
+  signal: AbortSignal;
 }
 
 /** Throws on every failure; the caller decides abort-vs-error. */
@@ -42,21 +46,27 @@ export async function* runTurns(o: LoopOptions): AsyncGenerator<ChatEvent, { ses
   let input: ResponseInput = [{ role: "user", content: o.question }];
 
   for (let turn = 1; ; turn++) {
+    // Between turns is the one place cancellation can be noticed without
+    // waiting for the provider to notice it first.
+    o.signal.throwIfAborted();
     if (turn > o.maxTurns) throw new Error("agent stopped: max_turns");
     if (o.stats.totalTokens > o.maxTotalTokens) throw new Error("agent stopped: max_tokens");
 
     const mapper = createTurnMapper();
     // instructions are not inherited through previous_response_id.
-    const events = await o.stream({
-      model: o.model,
-      instructions: o.instructions,
-      input,
-      tools: o.tools.definitions,
-      stream: true,
-      store: true,
-      previous_response_id: previousResponseId,
-      ...(o.reasoningEffort ? { reasoning: { effort: o.reasoningEffort } } : {}),
-    });
+    const events = await o.stream(
+      {
+        model: o.model,
+        instructions: o.instructions,
+        input,
+        tools: o.tools.definitions,
+        stream: true,
+        store: true,
+        previous_response_id: previousResponseId,
+        ...(o.reasoningEffort ? { reasoning: { effort: o.reasoningEffort } } : {}),
+      },
+      { signal: o.signal },
+    );
 
     for await (const event of events) {
       for (const out of mapper.push(event)) yield out;
