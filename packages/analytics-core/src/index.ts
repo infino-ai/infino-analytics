@@ -15,6 +15,8 @@ export type {
 } from "./spec.js";
 export type { ChatEvent } from "./events.js";
 export { drain, stepDetail } from "./events.js";
+export { buildSystemPrompt } from "./prompt.js";
+export type { PromptCapabilities } from "./prompt.js";
 export type { AgentHarness, HarnessRunParams, HarnessRunResult } from "./harness.js";
 export { InfinoClient } from "./client.js";
 export type { InfinoConfig } from "./client.js";

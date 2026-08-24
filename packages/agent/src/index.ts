@@ -2,13 +2,13 @@ import { createRequire } from "node:module";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import {
   InfinoClient,
+  buildSystemPrompt,
   drain,
   stepDetail,
   type AgentHarness,
   type InfinoConfig,
 } from "@infino-ai/analytics-core";
 import { buildLocalTools } from "./tools.js";
-import { buildSystemPrompt } from "./prompt.js";
 import { type ChatEvent } from "@infino-ai/analytics-core";
 
 export type { ChatEvent } from "@infino-ai/analytics-core";
@@ -113,7 +113,8 @@ async function* runAgent(params: {
     prompt: params.question,
     options: {
       model: params.config.model ?? DEFAULT_MODEL,
-      systemPrompt: buildSystemPrompt(),
+      // This harness auto-approves WebSearch/WebFetch (see ALLOWED_TOOLS).
+      systemPrompt: buildSystemPrompt({ webSearch: true }),
       maxTurns: params.config.maxTurns ?? DEFAULT_MAX_TURNS,
       maxBudgetUsd: params.config.maxBudgetUsd ?? DEFAULT_MAX_BUDGET_USD,
       abortController,

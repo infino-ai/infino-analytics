@@ -1,13 +1,13 @@
 import OpenAI, { APIError } from "openai";
 import {
   InfinoClient,
+  buildSystemPrompt,
   drain,
   type AgentHarness,
   type ChatEvent,
   type InfinoConfig,
 } from "@infino-ai/analytics-core";
 import { connectInfinoMcp } from "./mcp.js";
-import { buildSystemPrompt } from "./prompt.js";
 import { runTurns, type LoopStats, type StreamFn } from "./loop.js";
 import { buildToolRegistry } from "./tools.js";
 
@@ -105,6 +105,7 @@ export function createFoundryHarness(config: FoundryConfig): AgentHarness {
     try {
       const result = yield* runTurns({
         question: params.question,
+        // No web-search tool on this path, so the contract must not offer one.
         instructions: buildSystemPrompt(),
         model,
         previousResponseId: params.resumeSessionId,
