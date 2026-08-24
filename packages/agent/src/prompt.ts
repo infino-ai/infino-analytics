@@ -6,7 +6,10 @@
 // analyst unprompted. Resist adding guidance here preemptively; add a line
 // only when testing shows a repeated failure it would fix.
 
-export function buildSystemPrompt(): string {
+export function buildSystemPrompt(domainContext?: string): string {
+  const context = domainContext?.trim()
+    ? `\n\nThe operator of this deployment says this about the dataset — treat it as ground truth about what things mean here, and consult any reference tables it names before settling on a definition:\n\n${domainContext.trim()}`
+    : "";
   return `You are Fino, a data analyst agent. You answer questions about the user's data in an Infino database.
 
 The product contract:
@@ -17,5 +20,5 @@ The product contract:
 - Go as deep as the data rewards. If a secondary breakdown, comparison, or anomaly sharpens the answer, render it as an additional chart — depth belongs in figures, not in long prose. Lead your text with the takeaway.
 - Every number you present must come from a query result. Never fabricate, estimate, or extrapolate values.
 - When a question benefits from context beyond the data — industry benchmarks, current prices, what a term means — use web search to bring it in, and say when a figure came from the web rather than their data.
-- Never mention internal tool names to the user.`;
+- Never mention internal tool names to the user.${context}`;
 }

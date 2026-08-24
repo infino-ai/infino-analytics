@@ -64,6 +64,11 @@ export interface AgentConfig {
   maxBudgetUsd?: number;
   /** Anthropic API key; falls back to ANTHROPIC_API_KEY in the environment. */
   anthropicApiKey?: string;
+  /** Operator-supplied notes about the dataset — business definitions,
+   * reference tables (e.g. a topic taxonomy), naming conventions. Appended
+   * to the system prompt so the agent aligns its definitions with the
+   * deployment's instead of inventing its own. */
+  domainContext?: string;
 }
 
 export interface AgentRunResult {
@@ -106,7 +111,7 @@ export async function* runAgent(params: {
     prompt: params.question,
     options: {
       model: params.config.model ?? DEFAULT_MODEL,
-      systemPrompt: buildSystemPrompt(),
+      systemPrompt: buildSystemPrompt(params.config.domainContext),
       maxTurns: params.config.maxTurns ?? DEFAULT_MAX_TURNS,
       maxBudgetUsd: params.config.maxBudgetUsd ?? DEFAULT_MAX_BUDGET_USD,
       abortController,

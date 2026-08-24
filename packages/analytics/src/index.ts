@@ -66,6 +66,11 @@ export interface AnalyticsConfig {
    * visualization/dashboard surfaces never touch it. Default harness is the
    * Claude Agent SDK; the key falls back to ANTHROPIC_API_KEY. */
   llm?: { model?: string; anthropicApiKey?: string; maxBudgetUsd?: number };
+  /** Operator-supplied notes about the dataset — business definitions,
+   * reference tables (e.g. a topic taxonomy), naming conventions. The agent
+   * treats these as ground truth when choosing how to define and match
+   * concepts, instead of inventing its own definitions. */
+  domainContext?: string;
   /** Storage seam. Defaults to InMemoryStorage (nothing survives a
    * restart); pass SqliteStorage or your own StorageAdapter for
    * persistence. Consumers of this class never change when it does. */
@@ -170,6 +175,7 @@ export class Analytics {
       model: config.llm?.model,
       anthropicApiKey: config.llm?.anthropicApiKey,
       maxBudgetUsd: config.llm?.maxBudgetUsd,
+      domainContext: config.domainContext,
     };
     this.storage = config.storage ?? new InMemoryStorage();
     this.threads = this.storage.threads;

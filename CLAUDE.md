@@ -16,7 +16,9 @@ npm run dev              # builds web, starts the reference server on :8787
 
 The server needs `INFINO_URI` (https://<host>/<database>), `INFINO_API_KEY`,
 and `ANTHROPIC_API_KEY`. Optional: `FINO_MODEL`, `FINO_DB` (SQLite path),
-`FINO_SUGGESTIONS` (pipe-separated question chips), `PORT`.
+`FINO_SUGGESTIONS` (pipe-separated question chips), `FINO_DOMAIN_CONTEXT`
+(operator notes about the dataset, appended to the agent's system prompt),
+`PORT`.
 
 There is no test suite; verification is `npm run typecheck`, a web build,
 and exercising the running server.

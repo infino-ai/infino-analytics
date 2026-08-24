@@ -54,6 +54,7 @@ const storage = new SqliteStorage({ path: process.env.FINO_DB ?? "./data/analyti
 const analytics = new Analytics({
   infino: { uri: requireEnv("INFINO_URI") },
   llm: { model: process.env.FINO_MODEL },
+  domainContext: process.env.FINO_DOMAIN_CONTEXT,
   storage,
 });
 
