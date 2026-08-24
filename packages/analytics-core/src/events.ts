@@ -29,3 +29,22 @@ export type ChatEvent =
       turns?: number;
       costUsd?: number;
     };
+
+// Input summary for a trace step: prefer the payload the user would
+// recognize (the SQL text, the table, the chart title) over raw JSON. Sent
+// near-full so a UI can offer expand-to-read; display truncation is the
+// renderer's job. Shared so every harness produces identical trace steps.
+const STEP_DETAIL_MAX = 2000;
+
+export function stepDetail(input: Record<string, unknown> | undefined): string | undefined {
+  if (!input) return undefined;
+  const pick = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
+  const detail =
+    (pick(input.title) ? `${pick(input.chart_type) ?? "chart"} · ${pick(input.title)}` : undefined) ??
+    pick(input.query) ??
+    pick(input.sql) ??
+    pick(input.table) ??
+    (Object.keys(input).length ? JSON.stringify(input) : undefined);
+  if (!detail) return undefined;
+  return detail.length > STEP_DETAIL_MAX ? `${detail.slice(0, STEP_DETAIL_MAX)}…` : detail;
+}

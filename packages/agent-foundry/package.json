@@ -1,0 +1,19 @@
+{
+  "name": "@infino-ai/analytics-agent-foundry",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "smoke": "node --import tsx src/smoke.ts"
+  },
+  "dependencies": {
+    "@infino-ai/analytics-core": "*",
+    "@infino-ai/mcp-server": "^0.8.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "openai": "^7.5.0",
+    "zod": "^4.0.0"
+  }
+}
