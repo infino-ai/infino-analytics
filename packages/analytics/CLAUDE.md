@@ -26,7 +26,7 @@ short map for working on the package itself.
 
 - The heavy logic does not live here. Schemas, execute, filter injection,
   and storage interfaces belong in `@infino-ai/analytics-core`; the agent
-  harness belongs in `@infino-ai/analytics-agent`. This package composes
+  harness belongs in a `packages/agents/*` package. This package composes
   them and defines the consumer-facing API shape.
 - `src/echarts.ts` must stay browser-safe: no Node built-ins, no imports
   from `src/index.ts` or the agent/storage graph, no `echarts` dependency

@@ -74,6 +74,28 @@ nothing more. Writing your own: implement that, reuse `buildSystemPrompt`,
 and assert it with `assertHarnessConformance` from
 `@infino-ai/analytics-core/conformance`.
 
+### Choosing between the bundled two
+
+Both satisfy the same contract, so the UI and the persistence API cannot tell
+them apart. They are not equivalent in what they give you.
+
+| | `claude` (default) | `openai` |
+|---|---|---|
+| Provider | Anthropic, via the Claude Agent SDK | Any OpenAI Responses endpoint — `api.openai.com`, Azure OpenAI / AI Foundry |
+| Spend ceiling | `maxBudgetUsd`, enforced in real dollars | `maxTotalTokens`, a proxy checked **between turns** — a single runaway turn is unbounded |
+| `done.costUsd` | reported | omitted; the API bills tokens, not dollars |
+| `summary` event | emitted | never — the Responses API has no second copy of the final text |
+| Web search | yes (`WebSearch`/`WebFetch`) | no; the system prompt drops that promise |
+| Long threads | SDK compacts context automatically | **no compaction** — server-side history grows until the model's limit, then the turn fails |
+| Large tool results | SDK truncates before they reach the model | **unbounded** — a wide `infino_sql` can exhaust context (`create_chart` is safe: the model gets a 5-row receipt) |
+| Built-in tools | ships Bash/file I/O, so a deny list is mandatory | none; the model sees exactly the tools you pass |
+
+Read the last three rows together. The Claude harness is more robust on long
+or data-heavy conversations because the SDK is doing work we have not
+reimplemented. The OpenAI harness is safer by construction, because there is
+no ambient tool surface to lock down. Pick accordingly, and treat the two
+"unbounded" rows as known limitations rather than settled design.
+
 ## Methods
 
 ### `threads` (property): the conversation store
@@ -175,17 +197,19 @@ ignore types they don't handle; new event types may be added over time.
 | `delta` | `text` | A streamed text chunk of the message being written. Superseded by the next `progress`/`summary`, which carries the complete text |
 | `progress` | `text` | A complete intermediate text block (the agent narrating its work) |
 | `sql` | `query` | The exact SQL behind the chart that follows. Show it for transparency/copy |
-| `data` | `columns`, `rows`, `truncated` | A raw result set surfaced without a chart |
 | `chart` | `spec`, `result` | A rendered figure: the `VizSpec` plus the executed `ExecuteResult` (full rows ride this event, not the model's context) |
-| `summary` | `text` | The final answer, in GitHub-flavored markdown |
+| `summary` | `text` | The final answer, in GitHub-flavored markdown. Not every harness emits it — treat it as a `progress` that happens to be last |
 | `error` | `message` | Something failed (budget exceeded, engine unreachable). A `done` still follows |
-| `done` | `sessionId`, `turns?`, `costUsd?` | Always the last event. `costUsd` is the LLM spend for this question |
+| `done` | `sessionId`, `turns?`, `costUsd?` | Always the last event. `costUsd` is the LLM spend for this question, when the provider reports cost at all |
 
 A typical successful run looks like:
 
 ```
 status → progress → step → step_done → … → sql → chart → summary → done
 ```
+
+Only `done` is guaranteed, and only as the last event. Switch on `type` and
+ignore the rest; that is what keeps a UI working across harnesses.
 
 ## Rendering charts: the binding contract
 

@@ -90,7 +90,7 @@ Break any of these and consumers break with you.
   `maxTotalTokens`), no `summary` event (the Responses API has no second copy
   of the final text), and no web search. It also owns the MCP child process
   the Claude SDK used to own, so every exit path must close it.
-- **Tool policy** (`agent/src/index.ts`): under `dontAsk`, `allowedTools`
+- **Tool policy** (`agents/claude/src/index.ts`): under `dontAsk`, `allowedTools`
   only auto-approves; `disallowedTools` is what actually blocks. Host-
   reaching tools (Bash, file I/O) stay denied because the server process
   holds API keys.
@@ -98,6 +98,25 @@ Break any of these and consumers break with you.
   Node-only (it pulls in the agent harness); browser bundles import
   `@infino-ai/analytics/echarts`. Keep `echarts.ts` free of Node built-ins
   and server imports.
+
+## Known limitations
+
+Real, not theoretical. Do not paper over them with a comment; fix or flag.
+
+- **The OpenAI harness does not manage context.** `previous_response_id` grows
+  the server-side conversation monotonically and `agents/openai/src/loop.ts`
+  has no compaction. A long thread eventually fails the turn instead of
+  degrading. The Claude SDK handles this for the other harness.
+- **Tool output is unbounded into model context** on the OpenAI path.
+  `mcp.call()` returns whatever the server sends. `create_chart` is safe (the
+  model gets a 5-row receipt; full rows ride the side channel), but a wide
+  `infino_sql` is not. Any fix belongs in `agents/openai/src/tools.ts`, and
+  the truncation must be visible to the model, not silent.
+- **`maxTotalTokens` is checked between turns only**, so it bounds a runaway
+  loop but not a single runaway turn. It is a cost proxy, not `maxBudgetUsd`.
+- **No eval set.** The conformance suite proves a harness honours the
+  contract; nothing measures whether it answers *well*. Prompt or model
+  changes are currently unfalsifiable — say so rather than claiming parity.
 
 ## Adding a harness
 

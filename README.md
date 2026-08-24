@@ -18,10 +18,10 @@ This is an example application, built to be forked. It shows one way to
 assemble the pieces; the seams are designed so you can swap the parts
 you already own:
 
-- **LLM seam** — the agent harness is a thin layer (Claude Agent SDK by
-  default). Replace it with your own model loop; the tools, chart
-  contract, and persistence API don't change. `packages/agents/` holds the
-  worked examples — one Claude, one OpenAI — as peers behind one contract.
+- **LLM seam** — a harness is any generator of `ChatEvent`s. Swap in your
+  own model loop; the tools, chart contract, and persistence API do not
+  change. `packages/agents/` holds two worked examples (Claude, OpenAI) as
+  peers, both held to one conformance suite.
 - **Storage seam** — threads, visualizations, and dashboards persist
   through a `StorageAdapter` interface (SQLite by default). Implement it
   over your own database.
@@ -112,11 +112,15 @@ in a fork — the load-bearing contracts are spelled out there.
 
 ## Status
 
-Working: conversational analytics end to end (ask -> SQL -> chart) with
-persistent threads (transcripts survive restarts, reopened threads resume
-the model's context), and the visualization/dashboard persistence API:
-saved charts with runtime filter/time-range injection at execute,
-dashboards referencing them by id, stable REST shapes over HTTP. Two
-interchangeable harnesses (Claude, and the OpenAI Responses API) run the same
-UI unchanged, both held to one conformance suite.
-All of it on the same StorageAdapter.
+**Working.** Conversational analytics end to end (ask → SQL → chart) with
+persistent threads: transcripts survive restarts and a reopened thread resumes
+the model's context. The visualization/dashboard persistence API alongside it —
+saved charts with runtime filter and time-range injection at execute time,
+dashboards referencing them by id, stable REST shapes over HTTP. Two harnesses
+(Claude, and the OpenAI Responses API) drive the same UI unchanged, both held
+to one conformance suite, all on the same `StorageAdapter`.
+
+**Known limitations.** The OpenAI harness does not compact context or bound
+large tool results, so long or data-heavy threads are weaker there than on
+Claude; see [Choosing between the bundled two](packages/analytics/README.md#choosing-between-the-bundled-two).
+There is no eval set, so answer *quality* across harnesses is unmeasured.
