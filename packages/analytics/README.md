@@ -44,6 +44,7 @@ new Analytics(config: AnalyticsConfig)
 | `llm.model` | `string?` | `claude-opus-5` | Anthropic model id used by the default harness |
 | `llm.anthropicApiKey` | `string?` | `ANTHROPIC_API_KEY` | LLM credential |
 | `llm.maxBudgetUsd` | `number?` | `2` | Hard spend ceiling per question; the run stops with an `error` event if it would exceed this |
+| `llm.maxTurns` | `number?` | `25` | Ceiling on tool-use round trips per question. Raise it for workloads that legitimately need long runs (exhaustive enumeration, corpus-wide verification); the defaults suit interactive chat |
 | `domainContext` | `string?` | none | Operator notes about the dataset: business definitions, reference tables (for example a topic taxonomy table), naming conventions. The agent treats these as ground truth when deciding what a concept means in this deployment, instead of inventing its own definition |
 | `storage` | `StorageAdapter?` | `InMemoryStorage` | Where threads live. Pass `SqliteStorage` (from `@infino-ai/analytics-storage-sqlite`) or your own adapter; see Threads and persistence below |
 

@@ -53,7 +53,11 @@ const storage = new SqliteStorage({ path: process.env.FINO_DB ?? "./data/analyti
 
 const analytics = new Analytics({
   infino: { uri: requireEnv("INFINO_URI") },
-  llm: { model: process.env.FINO_MODEL },
+  llm: {
+    model: process.env.FINO_MODEL,
+    maxTurns: process.env.FINO_MAX_TURNS ? Number(process.env.FINO_MAX_TURNS) : undefined,
+    maxBudgetUsd: process.env.FINO_MAX_BUDGET_USD ? Number(process.env.FINO_MAX_BUDGET_USD) : undefined,
+  },
   domainContext: process.env.FINO_DOMAIN_CONTEXT,
   storage,
 });

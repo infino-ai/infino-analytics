@@ -65,7 +65,7 @@ export interface AnalyticsConfig {
   /** LLM seam — needed only for the conversational surface (ask). The
    * visualization/dashboard surfaces never touch it. Default harness is the
    * Claude Agent SDK; the key falls back to ANTHROPIC_API_KEY. */
-  llm?: { model?: string; anthropicApiKey?: string; maxBudgetUsd?: number };
+  llm?: { model?: string; anthropicApiKey?: string; maxBudgetUsd?: number; maxTurns?: number };
   /** Operator-supplied notes about the dataset — business definitions,
    * reference tables (e.g. a topic taxonomy), naming conventions. The agent
    * treats these as ground truth when choosing how to define and match
@@ -175,6 +175,7 @@ export class Analytics {
       model: config.llm?.model,
       anthropicApiKey: config.llm?.anthropicApiKey,
       maxBudgetUsd: config.llm?.maxBudgetUsd,
+      maxTurns: config.llm?.maxTurns,
       domainContext: config.domainContext,
     };
     this.storage = config.storage ?? new InMemoryStorage();

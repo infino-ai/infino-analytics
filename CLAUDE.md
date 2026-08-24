@@ -18,6 +18,7 @@ The server needs `INFINO_URI` (https://<host>/<database>), `INFINO_API_KEY`,
 and `ANTHROPIC_API_KEY`. Optional: `FINO_MODEL`, `FINO_DB` (SQLite path),
 `FINO_SUGGESTIONS` (pipe-separated question chips), `FINO_DOMAIN_CONTEXT`
 (operator notes about the dataset, appended to the agent's system prompt),
+`FINO_MAX_TURNS` / `FINO_MAX_BUDGET_USD` (per-question agent ceilings),
 `PORT`.
 
 There is no test suite; verification is `npm run typecheck`, a web build,
