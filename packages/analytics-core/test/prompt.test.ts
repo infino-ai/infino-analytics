@@ -23,6 +23,25 @@ describe("buildSystemPrompt", () => {
     strictEqual(count(buildSystemPrompt({ webSearch: true })), count(buildSystemPrompt()) + 1);
   });
 
+  it("appends operator domain notes as ground truth", () => {
+    const prompt = buildSystemPrompt({ domainContext: "Topic definitions live in `topics`." });
+    match(prompt, /treat it as ground truth/);
+    match(prompt, /Topic definitions live in `topics`\./);
+  });
+
+  it("adds nothing when domain notes are absent or blank", () => {
+    const bare = buildSystemPrompt();
+    strictEqual(buildSystemPrompt({ domainContext: "   " }), bare);
+    strictEqual(buildSystemPrompt({ domainContext: undefined }), bare);
+  });
+
+  // Dataset knowledge, not provider config — it must survive a harness swap.
+  it("carries domain notes into every capability combination", () => {
+    for (const caps of [{ domainContext: "X" }, { webSearch: true, domainContext: "X" }]) {
+      match(buildSystemPrompt(caps), /ground truth[\s\S]*X/);
+    }
+  });
+
   it("keeps the closing guardrail last, whatever the capabilities", () => {
     for (const prompt of [buildSystemPrompt(), buildSystemPrompt({ webSearch: true })]) {
       const bullets = prompt.split("\n").filter((l) => l.startsWith("- "));

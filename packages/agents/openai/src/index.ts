@@ -40,6 +40,10 @@ export interface OpenAIConfig {
   apiKey?: string;
   /** Model id, or an Azure deployment name. Falls back to OPENAI_MODEL. */
   model?: string;
+  /** Operator-supplied notes about the dataset, appended to the system prompt
+   * as ground truth. Dataset knowledge, so it applies here exactly as it does
+   * to the Claude harness. */
+  domainContext?: string;
   maxTurns?: number;
   /** Cumulative billed tokens per question (default 400k). */
   maxTotalTokens?: number;
@@ -120,7 +124,7 @@ export function createOpenAIHarness(config: OpenAIConfig, seams: OpenAISeams = {
       const result = yield* runTurns({
         question: params.question,
         // No web-search tool on this path, so the contract must not offer one.
-        instructions: buildSystemPrompt(),
+        instructions: buildSystemPrompt({ domainContext: config.domainContext }),
         model,
         previousResponseId: params.resumeSessionId,
         maxTurns: config.maxTurns ?? DEFAULT_MAX_TURNS,

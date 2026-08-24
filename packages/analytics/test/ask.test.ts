@@ -41,18 +41,31 @@ describe("Analytics config", () => {
     new Analytics({ infino: { uri: "https://example.test/db", apiKey: "test" }, llm: { model: "x" } });
   });
 
-  // Silently ignoring one of them is how a deployment runs the wrong model.
-  it("refuses both llm and harness", () => {
-    throws(
-      () =>
-        new Analytics({
-          infino: { uri: "https://example.test/db", apiKey: "test" },
-          llm: { model: "x" },
-          harness: fakeHarness([]),
-        }),
-      /either llm .* or harness .* not both/,
-    );
+  it("accepts domainContext alongside the built-in harness", () => {
+    new Analytics({
+      infino: { uri: "https://example.test/db", apiKey: "test" },
+      domainContext: "Topic definitions live in `topics`.",
+    });
   });
+
+  // Silently ignoring any of them is how a deployment runs the wrong model,
+  // or quietly loses its domain notes.
+  for (const [label, extra] of [
+    ["llm", { llm: { model: "x" } }],
+    ["domainContext", { domainContext: "notes" }],
+  ] as const) {
+    it(`refuses ${label} together with harness`, () => {
+      throws(
+        () =>
+          new Analytics({
+            infino: { uri: "https://example.test/db", apiKey: "test" },
+            ...extra,
+            harness: fakeHarness([]),
+          }),
+        /not both/,
+      );
+    });
+  }
 });
 
 describe("Analytics.ask", () => {

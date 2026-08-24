@@ -44,15 +44,29 @@ new Analytics(config: AnalyticsConfig)
 | `llm.model` | `string?` | `claude-opus-5` | Model id for the built-in harness |
 | `llm.apiKey` | `string?` | `ANTHROPIC_API_KEY` | Credential for the built-in harness |
 | `llm.maxBudgetUsd` | `number?` | `2` | Hard spend ceiling per question; the run stops with an `error` event if it would exceed this |
+| `domainContext` | `string?` | none | Operator notes about the dataset: business definitions, reference tables (for example a topic taxonomy table), naming conventions. The agent treats these as ground truth when deciding what a concept means in this deployment, instead of inventing its own definition |
 | `harness` | `AgentHarness?` | Claude Agent SDK | Replaces the LLM entirely — any generator of `ChatEvent`s. See Swapping the harness below |
 | `storage` | `StorageAdapter?` | `InMemoryStorage` | Where threads live. Pass `SqliteStorage` (from `@infino-ai/analytics-storage-sqlite`) or your own adapter; see Threads and persistence below |
 
 `llm` as a whole is optional: leave it out entirely if a deployment only uses
 the non-conversational surfaces.
 
-`llm` and `harness` are **mutually exclusive** — `llm` tunes the built-in
-harness, `harness` replaces it, so passing both throws at construction rather
-than silently ignoring one.
+`llm`/`domainContext` and `harness` are **mutually exclusive** — the first two
+configure the built-in harness, `harness` replaces it, so passing both throws at
+construction rather than silently ignoring one. A replacement harness takes its
+own `domainContext`:
+`createOpenAIHarness({ infino, domainContext })`.
+
+`domainContext` is the highest-leverage config field for answer quality on
+domain-specific data. Most "wrong" answers on real datasets are definitional
+(the agent picked a reasonable definition that is not the house one); a few
+lines here, or a pointer to a definitions table in the database, aligns it:
+
+```ts
+domainContext: `Topic definitions live in the "topics" table (one row per
+topic: name + description). When a question maps to a topic, read its
+definition first and match conversations against it.`
+```
 
 > **Breaking change:** `llm.anthropicApiKey` is now `llm.apiKey`. The facade is
 > provider-neutral; the provider is whichever harness you run.

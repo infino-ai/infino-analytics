@@ -14,6 +14,12 @@ export interface PromptCapabilities {
   /** The harness exposes a web-search tool, so the contract may promise it.
    * Claude's does; a harness without one must not make the offer. */
   webSearch?: boolean;
+  /** Operator-supplied notes about the dataset — business definitions,
+   * reference tables (e.g. a topic taxonomy), naming conventions. Appended as
+   * ground truth so the agent aligns with the deployment's definitions
+   * instead of inventing a reasonable-but-foreign one per question. Dataset
+   * knowledge, not provider config, so every harness passes it through. */
+  domainContext?: string;
 }
 
 export function buildSystemPrompt(caps: PromptCapabilities = {}): string {
@@ -29,9 +35,13 @@ export function buildSystemPrompt(caps: PromptCapabilities = {}): string {
     "Never mention internal tool names to the user.",
   ];
 
+  const context = caps.domainContext?.trim()
+    ? `\n\nThe operator of this deployment says this about the dataset — treat it as ground truth about what things mean here, and consult any reference tables it names before settling on a definition:\n\n${caps.domainContext.trim()}`
+    : "";
+
   return `You are Fino, a data analyst agent. You answer questions about the user's data in an Infino database.
 
 The product contract:
 
-${bullets.map((b) => `- ${b}`).join("\n")}`;
+${bullets.map((b) => `- ${b}`).join("\n")}${context}`;
 }

@@ -17,10 +17,11 @@ npm run dev              # builds web, starts the reference server on :8787
 
 The server needs `INFINO_URI` (https://<host>/<database>), `INFINO_API_KEY`,
 and `ANTHROPIC_API_KEY`. Optional: `FINO_MODEL`, `FINO_DB` (SQLite path),
-`FINO_SUGGESTIONS` (pipe-separated question chips), `PORT`.
-`FINO_HARNESS=openai` swaps in the OpenAI harness, which needs
+`FINO_SUGGESTIONS` (pipe-separated question chips), `FINO_DOMAIN_CONTEXT`
+(operator notes about the dataset, appended to the agent's system prompt),
+`PORT`. `FINO_HARNESS=openai` swaps in the OpenAI harness, which needs
 `OPENAI_BASE_URL`, `OPENAI_API_KEY`, and `OPENAI_MODEL` instead of
-`ANTHROPIC_API_KEY`.
+`ANTHROPIC_API_KEY`; `FINO_DOMAIN_CONTEXT` applies to either.
 
 `npm test` covers the pure logic (filters, execute/binding, mergePatch,
 toEChartsOption, the ask() seam, the OpenAI stream mapper and turn loop) plus

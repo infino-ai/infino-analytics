@@ -69,6 +69,12 @@ export interface AnalyticsConfig {
    * touch it. Mutually exclusive with `harness`, which replaces the default
    * outright. The key falls back to ANTHROPIC_API_KEY. */
   llm?: { model?: string; apiKey?: string; maxBudgetUsd?: number };
+  /** Operator-supplied notes about the dataset — business definitions,
+   * reference tables (e.g. a topic taxonomy), naming conventions. The agent
+   * treats these as ground truth when choosing how to define and match
+   * concepts, instead of inventing its own definitions. Configures the
+   * built-in harness; a replacement `harness` takes its own. */
+  domainContext?: string;
   /** Replace the LLM entirely: any generator of ChatEvents. Peer harnesses
    * live in `packages/agents/`. */
   harness?: AgentHarness;
@@ -171,11 +177,12 @@ export class Analytics {
   readonly dashboards: Dashboards;
 
   constructor(config: AnalyticsConfig) {
-    // Silently dropping one of these is how a deployment ends up running a
-    // model nobody configured. Refuse instead.
-    if (config.harness && config.llm) {
+    // Silently dropping any of these is how a deployment ends up running a
+    // model nobody configured, or losing its domain notes. Refuse instead.
+    if (config.harness && (config.llm || config.domainContext !== undefined)) {
       throw new Error(
-        "pass either llm (tunes the built-in Claude harness) or harness (replaces it), not both",
+        "pass either llm/domainContext (which configure the built-in Claude harness) " +
+          "or harness (which replaces it), not both",
       );
     }
     this.harness =
@@ -185,6 +192,7 @@ export class Analytics {
         model: config.llm?.model,
         anthropicApiKey: config.llm?.apiKey,
         maxBudgetUsd: config.llm?.maxBudgetUsd,
+        domainContext: config.domainContext,
       });
     this.storage = config.storage ?? new InMemoryStorage();
     this.threads = this.storage.threads;

@@ -57,10 +57,14 @@ const storage = new SqliteStorage({ path: process.env.FINO_DB ?? "./data/analyti
 // single entry here.
 const INFINO_URI = requireEnv("INFINO_URI");
 
+// Dataset notes are harness-agnostic: whichever one runs, it gets them.
+const DOMAIN_CONTEXT = process.env.FINO_DOMAIN_CONTEXT;
+
 const HARNESSES: Record<string, () => Promise<AgentHarness>> = {
   openai: async () =>
     (await import("@infino-ai/analytics-agent-openai")).createOpenAIHarness({
       infino: { uri: INFINO_URI },
+      domainContext: DOMAIN_CONTEXT,
     }),
 };
 
@@ -76,7 +80,9 @@ const harness = selected ? await HARNESSES[selected]() : undefined;
 // both is rejected, so send exactly one.
 const analytics = new Analytics({
   infino: { uri: INFINO_URI },
-  ...(harness ? { harness } : { llm: { model: process.env.FINO_MODEL } }),
+  ...(harness
+    ? { harness }
+    : { llm: { model: process.env.FINO_MODEL }, domainContext: DOMAIN_CONTEXT }),
   storage,
 });
 
