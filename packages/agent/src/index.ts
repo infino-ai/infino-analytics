@@ -1,6 +1,10 @@
 import { createRequire } from "node:module";
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import { InfinoClient, type InfinoConfig } from "@infino-ai/analytics-core";
+import {
+  InfinoClient,
+  type AgentHarness,
+  type InfinoConfig,
+} from "@infino-ai/analytics-core";
 import { buildLocalTools } from "./tools.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { type ChatEvent } from "@infino-ai/analytics-core";
@@ -233,6 +237,12 @@ export async function* runAgent(params: {
   }
 
   return { sessionId };
+}
+
+/** Bind config to the harness seam. The facade holds one of these and never
+ * names a model. */
+export function createClaudeHarness(config: AgentConfig): AgentHarness {
+  return (params) => runAgent({ ...params, config });
 }
 
 function* drain(queue: ChatEvent[]): Generator<ChatEvent> {

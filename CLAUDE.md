@@ -25,9 +25,10 @@ and exercising the running server.
 
 ```
 packages/analytics-core     contract layer: VizSpec, ChatEvent, execute(),
-                            filter injection, StorageAdapter. No LLM code.
-packages/agent              the LLM harness (Claude Agent SDK) + the
-                            create_chart tool + system prompt. Replaceable.
+                            filter injection, StorageAdapter, AgentHarness,
+                            the create_chart tool contract. No LLM SDK.
+packages/agent              the LLM harness (Claude Agent SDK): event loop,
+                            tool policy, system prompt. Replaceable.
 packages/storage-sqlite     reference StorageAdapter (one SQLite file)
 packages/analytics          the facade consumers install: Analytics class,
                             toEChartsOption. Depends on all of the above.
@@ -54,7 +55,7 @@ Break any of these and consumers break with you.
   places: the `CHART_TYPES` enum + semantics comment
   (`analytics-core/src/spec.ts`), binding/shape checks
   (`analytics-core/src/execute.ts`), the tool description intuition
-  (`agent/src/tools.ts`), and the option builder
+  (`analytics-core/src/chart-tool.ts`), and the option builder
   (`analytics/src/echarts.ts`).
 - **Degrade, never fail.** Execute problems become machine-readable
   `warnings` and `filters_skipped` entries while the data still returns;
@@ -63,6 +64,9 @@ Break any of these and consumers break with you.
 - **`ChatEvent` is the harness contract** (`analytics-core/src/events.ts`).
   A replacement LLM harness is any generator yielding these events; the
   facade, server, and UI must keep working with nothing but the events.
+  The type is `AgentHarness` (`analytics-core/src/harness.ts`); pass one as
+  `new Analytics({harness})`. The chart tool is shared by every harness
+  (`analytics-core/src/chart-tool.ts`) so its contract cannot drift.
 - **Storage is a seam.** Consumers type against `StorageAdapter` only; a
   new database is a new adapter package, not edits to consumers.
 - **Tool policy** (`agent/src/index.ts`): under `dontAsk`, `allowedTools`

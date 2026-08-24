@@ -1,4 +1,4 @@
-import { runAgent, type AgentConfig } from "@infino-ai/analytics-agent";
+import { createClaudeHarness } from "@infino-ai/analytics-agent";
 import {
   DashboardSchema,
   InMemoryStorage,
@@ -11,6 +11,7 @@ import {
   mergePatch,
   newDashboard,
   newVisualization,
+  type AgentHarness,
   type ChatEvent,
   type Dashboard,
   type ExecuteResult,
@@ -24,6 +25,7 @@ import {
 } from "@infino-ai/analytics-core";
 
 export type {
+  AgentHarness,
   ChatEvent,
   VizSpec,
   Binding,
@@ -66,6 +68,9 @@ export interface AnalyticsConfig {
    * visualization/dashboard surfaces never touch it. Default harness is the
    * Claude Agent SDK; the key falls back to ANTHROPIC_API_KEY. */
   llm?: { model?: string; anthropicApiKey?: string; maxBudgetUsd?: number };
+  /** LLM harness override. Defaults to the Claude Agent SDK built from
+   * `llm`; pass any generator of ChatEvents to run a different model. */
+  harness?: AgentHarness;
   /** Storage seam. Defaults to InMemoryStorage (nothing survives a
    * restart); pass SqliteStorage or your own StorageAdapter for
    * persistence. Consumers of this class never change when it does. */
@@ -151,7 +156,7 @@ export interface Dashboards {
  *   backend.
  */
 export class Analytics {
-  private readonly agentConfig: AgentConfig;
+  private readonly harness: AgentHarness;
   private readonly storage: StorageAdapter;
   private readonly client: InfinoClient;
 
@@ -165,12 +170,14 @@ export class Analytics {
   readonly dashboards: Dashboards;
 
   constructor(config: AnalyticsConfig) {
-    this.agentConfig = {
-      infino: config.infino,
-      model: config.llm?.model,
-      anthropicApiKey: config.llm?.anthropicApiKey,
-      maxBudgetUsd: config.llm?.maxBudgetUsd,
-    };
+    this.harness =
+      config.harness ??
+      createClaudeHarness({
+        infino: config.infino,
+        model: config.llm?.model,
+        anthropicApiKey: config.llm?.anthropicApiKey,
+        maxBudgetUsd: config.llm?.maxBudgetUsd,
+      });
     this.storage = config.storage ?? new InMemoryStorage();
     this.threads = this.storage.threads;
     this.client = new InfinoClient(config.infino);
@@ -206,9 +213,8 @@ export class Analytics {
       }
     }
 
-    const run = runAgent({
+    const run = this.harness({
       question,
-      config: this.agentConfig,
       resumeSessionId: thread?.agentSessionId,
       signal: opts.signal,
     });
@@ -233,6 +239,9 @@ export class Analytics {
         yield event;
       }
     } finally {
+      // Manual iteration means an abandoned `ask` leaves `run` suspended at a
+      // yield; return() runs the harness's own cleanup (child processes).
+      await run.return({});
       if (thread) {
         if (turnEvents.length > 0) {
           await this.threads.appendMessage(thread.id, { role: "assistant", events: turnEvents });

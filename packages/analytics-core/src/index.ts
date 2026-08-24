@@ -14,9 +14,12 @@ export type {
   ExecuteResult,
 } from "./spec.js";
 export type { ChatEvent } from "./events.js";
+export type { AgentHarness, HarnessRunParams, HarnessRunResult } from "./harness.js";
 export { InfinoClient } from "./client.js";
 export type { InfinoConfig } from "./client.js";
 export { execute } from "./execute.js";
+export { CREATE_CHART_INPUT, CREATE_CHART_DESCRIPTION, runCreateChart } from "./chart-tool.js";
+export type { CreateChartArgs } from "./chart-tool.js";
 export { InMemoryStorage, isPersistentEvent, memoryDocStore } from "./storage.js";
 export type {
   StorageAdapter,
