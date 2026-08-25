@@ -5,6 +5,7 @@ import {
   buildSystemPrompt,
   drain,
   stepDetail,
+  stepResult,
   type AgentHarness,
   type InfinoConfig,
 } from "@infino-ai/analytics-core";
@@ -212,7 +213,12 @@ async function* runAgent(params: {
         if (Array.isArray(content)) {
           for (const block of content) {
             if (block?.type === "tool_result" && block.tool_use_id) {
-              yield { type: "step_done", id: block.tool_use_id, ok: block.is_error !== true };
+              yield {
+                type: "step_done",
+                id: block.tool_use_id,
+                ok: block.is_error !== true,
+                result: stepResult(block.content),
+              };
             }
           }
         }

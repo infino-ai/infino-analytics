@@ -8,9 +8,11 @@ import type { ExecuteResult, VizSpec } from "./spec.js";
 export type ChatEvent =
   | { type: "status"; text: string } // transient activity label ("thinking…"); replaces the previous one
   // A tool call, as a persistent trace step: real tool name + a short input
-  // detail (the SQL text, the table name). step_done marks it finished.
+  // detail (the SQL text, the table name). step_done marks it finished and
+  // may carry a bounded text rendering of what the tool returned (the error
+  // text when ok is false), so a trace UI can show request and response.
   | { type: "step"; id: string; tool: string; detail?: string }
-  | { type: "step_done"; id: string; ok: boolean }
+  | { type: "step_done"; id: string; ok: boolean; result?: string }
   | { type: "delta"; text: string } // streamed text chunk; superseded by the next progress/summary
   | { type: "progress"; text: string }
   | { type: "sql"; query: string }
@@ -41,6 +43,40 @@ export function stepDetail(input: Record<string, unknown> | undefined): string |
     (Object.keys(input).length ? JSON.stringify(input) : undefined);
   if (!detail) return undefined;
   return detail.length > STEP_DETAIL_MAX ? `${detail.slice(0, STEP_DETAIL_MAX)}…` : detail;
+}
+
+// Result summary for a trace step: the tool's output as text, bounded at the
+// source because step_done events are persisted with the transcript — a wide
+// query result must not be stored in full a second time (the model already
+// saw it; chart rows already ride the chart event). Shared so every harness
+// renders results the same way.
+export const STEP_RESULT_MAX = 4000;
+
+export function stepResult(content: unknown): string | undefined {
+  const text = flattenToolContent(content).trim();
+  if (!text) return undefined;
+  return text.length > STEP_RESULT_MAX ? `${text.slice(0, STEP_RESULT_MAX)}…` : text;
+}
+
+function flattenToolContent(content: unknown): string {
+  if (content == null) return "";
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    // MCP / provider tool results: [{type:"text", text}, ...]
+    return content
+      .map((block) =>
+        block && typeof block === "object" && typeof (block as { text?: unknown }).text === "string"
+          ? (block as { text: string }).text
+          : flattenToolContent(block),
+      )
+      .filter(Boolean)
+      .join("\n");
+  }
+  try {
+    return JSON.stringify(content);
+  } catch {
+    return String(content);
+  }
 }
 
 /** Flush a harness's side-channel queue into its outbound stream. Tools push

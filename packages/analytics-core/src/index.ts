@@ -14,7 +14,7 @@ export type {
   ExecuteResult,
 } from "./spec.js";
 export type { ChatEvent } from "./events.js";
-export { drain, stepDetail } from "./events.js";
+export { drain, stepDetail, stepResult, STEP_RESULT_MAX } from "./events.js";
 export { buildSystemPrompt } from "./prompt.js";
 export type { PromptCapabilities } from "./prompt.js";
 export type { AgentHarness, HarnessRunParams, HarnessRunResult } from "./harness.js";

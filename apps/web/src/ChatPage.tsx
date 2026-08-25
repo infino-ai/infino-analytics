@@ -175,14 +175,26 @@ function AddToDashboard({ spec }: { spec: Extract<ChatEvent, { type: "chart" }>[
 }
 
 // Step events gain client-side completion state when step_done arrives.
-type TurnEvent = ChatEvent & { done?: boolean; ok?: boolean };
+// `output` is step_done.result; named apart because the chart event owns `result`.
+type TurnEvent = ChatEvent & { done?: boolean; ok?: boolean; output?: string };
 type StepEvent = Extract<TurnEvent, { type: "step" }>;
 
+// Tool results are usually JSON (schemas, search hits, the chart receipt);
+// show them indented when they parse, verbatim otherwise.
+function prettify(text: string): string {
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2);
+  } catch {
+    return text;
+  }
+}
+
 // A tool call, inline in the narrative where it happened: a quiet chip with
-// the tool name, expandable to read the input it ran with.
+// the tool name, expandable to read the request it ran with and the response
+// it got back (the error text when it failed).
 function StepChip({ step }: { step: StepEvent }) {
   const [open, setOpen] = useState(false);
-  const expandable = Boolean(step.detail);
+  const expandable = Boolean(step.detail || step.output);
   const state = !step.done ? "running" : step.ok ? "done" : "failed";
   return (
     <div className={`stepchip ${state}${open ? " open" : ""}`}>
@@ -203,9 +215,22 @@ function StepChip({ step }: { step: StepEvent }) {
       {expandable && (
         <div className="stepchip-wrap">
           <div className="stepchip-inner">
-            <pre>
-              <code>{step.detail}</code>
-            </pre>
+            {step.detail && (
+              <>
+                <div className="stepchip-label">Request</div>
+                <pre>
+                  <code>{step.detail}</code>
+                </pre>
+              </>
+            )}
+            {step.output && (
+              <>
+                <div className="stepchip-label">{step.ok === false ? "Error" : "Response"}</div>
+                <pre className={step.ok === false ? "failed" : undefined}>
+                  <code>{prettify(step.output)}</code>
+                </pre>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -252,7 +277,7 @@ function turnsFromMessages(messages: StoredMessage[]): Turn[] {
       for (const e of msg.events) {
         if (e.type === "step_done") {
           const step = events.find((s) => s.type === "step" && s.id === e.id);
-          if (step) Object.assign(step, { done: true, ok: e.ok });
+          if (step) Object.assign(step, { done: true, ok: e.ok, output: e.result });
         } else {
           events.push(e.type === "step" ? { ...e } : e);
         }
@@ -456,7 +481,9 @@ export default function ChatPage() {
             turn.live = turn.live + event.text;
           } else if (event.type === "step_done") {
             turn.events = turn.events.map((e) =>
-              e.type === "step" && e.id === event.id ? { ...e, done: true, ok: event.ok } : e,
+              e.type === "step" && e.id === event.id
+                ? { ...e, done: true, ok: event.ok, output: event.result }
+                : e,
             );
           } else {
             // The complete text block supersedes its streamed deltas; a new

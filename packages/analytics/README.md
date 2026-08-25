@@ -215,7 +215,7 @@ ignore types they don't handle; new event types may be added over time.
 |---|---|---|
 | `status` | `text` | Transient activity label ("thinking"). Replaces the previous status; display only the latest |
 | `step` | `id`, `tool`, `detail?` | A tool call started. `tool` is the bare tool name, `detail` is a one-line input summary (the SQL text, the table name) |
-| `step_done` | `id`, `ok` | The step with that `id` finished; `ok: false` means the tool errored (the agent usually self-corrects and continues) |
+| `step_done` | `id`, `ok`, `result?` | The step with that `id` finished; `ok: false` means the tool errored (the agent usually self-corrects and continues). `result` is a bounded text rendering of what the tool returned (the error text on failure), for request/response trace UIs; capped at 4,000 characters at the source because it is persisted with the transcript |
 | `delta` | `text` | A streamed text chunk of the message being written. Superseded by the next `progress`/`summary`, which carries the complete text |
 | `progress` | `text` | A complete intermediate text block (the agent narrating its work) |
 | `sql` | `query` | The exact SQL behind the chart that follows. Show it for transparency/copy |
