@@ -95,12 +95,16 @@ Break any of these and consumers break with you.
 - **Storage is a seam.** Consumers type against `StorageAdapter` only; a
   new database is a new adapter package, not edits to consumers.
 - **Harnesses are peers under `packages/agents/`**, mirroring `storage-*`:
-  `<seam>-<implementation>`. Neither is privileged and neither is a default:
-  `analytics` names no provider, and `apps/server` requires `FINO_HARNESS` to
-  name one from `HARNESSES` — booting without it is an error, because a
-  fallback would quietly make one provider the answer. Each entry owns its own env block,
-  so a knob only reaches the harness that understands it — never add a
-  provider dependency or a provider import to `analytics`.
+  `<seam>-<implementation>`. Neither is privileged and neither is a default —
+  `apps/server` requires `FINO_HARNESS` to name one from `HARNESSES`, and
+  booting without it is an error, because a fallback would quietly make one
+  provider the answer. Each entry owns its own env block, so a knob only
+  reaches the harness that understands it.
+- **A package names its own provider and nothing else.** Peers never name each
+  other; `analytics-core`, `analytics`, `storage-*` and `apps/web` name none.
+  Comments count — prose drifts before code does. The `seam boundaries` suite
+  in `analytics-core/test` enforces both that and the rule that `analytics`
+  declares no harness dependency, which is what lets a fork ship one provider.
 - **The OpenAI harness diverges deliberately** (`agents/openai/src/index.ts`):
   no `done.costUsd` (the API bills tokens, not dollars — the ceiling is
   `maxTotalTokens`), no `summary` event (the Responses API has no second copy
