@@ -7,7 +7,9 @@ on:
 
 jobs:
   check:
-    name: Typecheck, test & build
+    # Branch protection on main matches this exact string; renaming it leaves
+    # a required check that never reports. The job runs tests regardless.
+    name: Typecheck & build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
