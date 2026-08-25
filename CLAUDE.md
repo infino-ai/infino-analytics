@@ -8,7 +8,7 @@ swaps and what it must preserve.
 ## Commands
 
 ```sh
-npm install              # Node 22+
+npm install              # Node 22.18+ (tests spawn a bare .ts child)
 npm run typecheck        # tsc across all packages, tests, and the web app
 npm test                 # node:test over the pure logic; no network
 npm run build            # bundles the web app (Vite)

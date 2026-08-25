@@ -15,7 +15,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # .nvmrc is the single source: the MCP lifecycle tests spawn a bare
+          # .ts child, so they need Node's type stripping (on by default in 22.18).
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npm run typecheck

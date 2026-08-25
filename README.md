@@ -31,7 +31,9 @@ you already own:
 
 ## Quickstart
 
-Requires Node 22 or newer.
+Requires Node 22.18 or newer — the test suite spawns a bare `.ts` child
+process and relies on Node's type stripping, which is on by default from
+22.18.
 
 ```sh
 npm install
