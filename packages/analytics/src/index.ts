@@ -1,6 +1,6 @@
-import { runAgent, type AgentConfig } from "@infino-ai/analytics-agent";
 import {
   DashboardSchema,
+  FilterSchema,
   InMemoryStorage,
   InfinoClient,
   NewDashboardSchema,
@@ -11,6 +11,7 @@ import {
   mergePatch,
   newDashboard,
   newVisualization,
+  type AgentHarness,
   type ChatEvent,
   type Dashboard,
   type ExecuteResult,
@@ -24,6 +25,7 @@ import {
 } from "@infino-ai/analytics-core";
 
 export type {
+  AgentHarness,
   ChatEvent,
   VizSpec,
   Binding,
@@ -62,15 +64,12 @@ export interface AnalyticsConfig {
   /** Infino target: hosted https://<host>/<database>. The apiKey falls back
    * to INFINO_API_KEY. */
   infino: { uri: string; apiKey?: string };
-  /** LLM seam — needed only for the conversational surface (ask). The
-   * visualization/dashboard surfaces never touch it. Default harness is the
-   * Claude Agent SDK; the key falls back to ANTHROPIC_API_KEY. */
-  llm?: { model?: string; anthropicApiKey?: string; maxBudgetUsd?: number; maxTurns?: number };
-  /** Operator-supplied notes about the dataset — business definitions,
-   * reference tables (e.g. a topic taxonomy), naming conventions. The agent
-   * treats these as ground truth when choosing how to define and match
-   * concepts, instead of inventing its own definitions. */
-  domainContext?: string;
+  /** The LLM seam: any generator of ChatEvents. Harnesses are peers under
+   * `packages/agents/`; construct one and pass it, model and dataset notes
+   * included — this class holds no provider config and no default, so a
+   * deployment installs only the provider it picked. Optional because the
+   * visualization and dashboard surfaces never touch it; only `ask` does. */
+  harness?: AgentHarness;
   /** Storage seam. Defaults to InMemoryStorage (nothing survives a
    * restart); pass SqliteStorage or your own StorageAdapter for
    * persistence. Consumers of this class never change when it does. */
@@ -156,7 +155,7 @@ export interface Dashboards {
  *   backend.
  */
 export class Analytics {
-  private readonly agentConfig: AgentConfig;
+  private readonly harness?: AgentHarness;
   private readonly storage: StorageAdapter;
   private readonly client: InfinoClient;
 
@@ -170,14 +169,7 @@ export class Analytics {
   readonly dashboards: Dashboards;
 
   constructor(config: AnalyticsConfig) {
-    this.agentConfig = {
-      infino: config.infino,
-      model: config.llm?.model,
-      anthropicApiKey: config.llm?.anthropicApiKey,
-      maxBudgetUsd: config.llm?.maxBudgetUsd,
-      maxTurns: config.llm?.maxTurns,
-      domainContext: config.domainContext,
-    };
+    this.harness = config.harness;
     this.storage = config.storage ?? new InMemoryStorage();
     this.threads = this.storage.threads;
     this.client = new InfinoClient(config.infino);
@@ -199,6 +191,10 @@ export class Analytics {
     question: string,
     opts: { threadId?: string; signal?: AbortSignal } = {},
   ): AsyncGenerator<ChatEvent> {
+    // The data-plane surfaces work without a harness; this one cannot.
+    if (!this.harness) {
+      throw new Error("ask() needs a harness: pass one as new Analytics({harness})");
+    }
     const thread = opts.threadId ? await this.threads.get(opts.threadId) : null;
     if (opts.threadId && !thread) {
       throw new Error(`unknown thread: ${opts.threadId}`);
@@ -213,9 +209,8 @@ export class Analytics {
       }
     }
 
-    const run = runAgent({
+    const run = this.harness({
       question,
-      config: this.agentConfig,
       resumeSessionId: thread?.agentSessionId,
       signal: opts.signal,
     });
@@ -240,6 +235,9 @@ export class Analytics {
         yield event;
       }
     } finally {
+      // Manual iteration means an abandoned `ask` leaves `run` suspended at a
+      // yield; return() runs the harness's own cleanup (child processes).
+      await run.return({});
       if (thread) {
         if (turnEvents.length > 0) {
           await this.threads.appendMessage(thread.id, { role: "assistant", events: turnEvents });
@@ -253,6 +251,13 @@ export class Analytics {
 }
 
 // ── the persistence surfaces ───────────────────────────────────────────────
+
+/** Saved filters were parsed on write; request filters arrive straight from a
+ * caller or the HTTP boundary. An unknown operator has to fail here — reaching
+ * the SQL builder turns it into a misleading sql_parse_error receipt. */
+function parseRequestFilters(filters: Filter[] | undefined): Filter[] | undefined {
+  return filters?.map((f) => FilterSchema.parse(f));
+}
 
 function buildVisualizations(storage: StorageAdapter, client: InfinoClient): Visualizations {
   const store = storage.visualizations;
@@ -297,7 +302,7 @@ function buildVisualizations(storage: StorageAdapter, client: InfinoClient): Vis
       }
       return execute(client, spec, {
         savedFilters: spec.filters,
-        filters: opts.filters,
+        filters: parseRequestFilters(opts.filters),
         timeRange: opts.timeRange ?? spec.time_range,
       });
     },
@@ -354,7 +359,7 @@ function buildDashboards(storage: StorageAdapter, visualizations: Visualizations
     async execute(id, opts = {}) {
       const dash = await store.get(id);
       if (!dash) throw new Error(`unknown dashboard: ${id}`);
-      const filters = opts.filters ?? dash.filters;
+      const filters = parseRequestFilters(opts.filters) ?? dash.filters;
       const timeRange = opts.timeRange ?? dash.time_range;
 
       const resolve = async (panel: Dashboard["panels"][number]): Promise<DashboardPanelResult> => {

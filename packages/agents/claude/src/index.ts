@@ -1,8 +1,14 @@
 import { createRequire } from "node:module";
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import { InfinoClient, type InfinoConfig } from "@infino-ai/analytics-core";
+import {
+  InfinoClient,
+  buildSystemPrompt,
+  drain,
+  stepDetail,
+  type AgentHarness,
+  type InfinoConfig,
+} from "@infino-ai/analytics-core";
 import { buildLocalTools } from "./tools.js";
-import { buildSystemPrompt } from "./prompt.js";
 import { type ChatEvent } from "@infino-ai/analytics-core";
 
 export type { ChatEvent } from "@infino-ai/analytics-core";
@@ -55,9 +61,8 @@ const DEFAULT_MAX_BUDGET_USD = 2;
 
 export interface AgentConfig {
   infino: InfinoConfig;
-  /** Anthropic model id; the LLM seam's default harness is the Claude Agent
-   * SDK, so this is a Claude model. Swapping the harness replaces this file,
-   * not the tools or prompts. */
+  /** Anthropic model id — this harness is the Claude Agent SDK, so a Claude
+   * model. Swapping harnesses replaces this file, not the tools or prompts. */
   model?: string;
   maxTurns?: number;
   /** Per-question spend ceiling in USD (default 2). */
@@ -76,14 +81,18 @@ export interface AgentRunResult {
 }
 
 /** Run one question through the agent, yielding typed events. Returns the
- * SDK session id so a follow-up can resume the conversation. */
-export async function* runAgent(params: {
+ * SDK session id so a follow-up can resume the conversation. Internal:
+ * consumers go through createClaudeHarness. */
+async function* runAgent(params: {
   question: string;
   config: AgentConfig;
   resumeSessionId?: string;
   /** Abort cancels the underlying run (the model stops, tools stop) — not
    * just the event stream. Wire client disconnects to this. */
   signal?: AbortSignal;
+  /** The SDK call, injectable so the event mapping below can be tested
+   * without a provider. Production never passes this. */
+  queryFn?: QueryFn;
 }): AsyncGenerator<ChatEvent, AgentRunResult> {
   const client = new InfinoClient(params.config.infino);
 
@@ -107,11 +116,15 @@ export async function* runAgent(params: {
   // track it so the summary isn't emitted twice.
   let lastAssistantText = "";
 
-  const messages = query({
+  const messages = (params.queryFn ?? query)({
     prompt: params.question,
     options: {
       model: params.config.model ?? DEFAULT_MODEL,
-      systemPrompt: buildSystemPrompt(params.config.domainContext),
+      // This harness auto-approves WebSearch/WebFetch (see ALLOWED_TOOLS).
+      systemPrompt: buildSystemPrompt({
+        webSearch: true,
+        domainContext: params.config.domainContext,
+      }),
       maxTurns: params.config.maxTurns ?? DEFAULT_MAX_TURNS,
       maxBudgetUsd: params.config.maxBudgetUsd ?? DEFAULT_MAX_BUDGET_USD,
       abortController,
@@ -240,24 +253,14 @@ export async function* runAgent(params: {
   return { sessionId };
 }
 
-function* drain(queue: ChatEvent[]): Generator<ChatEvent> {
-  while (queue.length > 0) yield queue.shift() as ChatEvent;
+/** The Agent SDK's entry point, as a type — the harness's only provider call
+ * and therefore its only test seam. */
+export type QueryFn = typeof query;
+
+/** Bind config to the harness seam. The facade holds one of these and never
+ * names a model. `queryFn` is the conformance suite's injection point. */
+export function createClaudeHarness(config: AgentConfig, queryFn?: QueryFn): AgentHarness {
+  return (params) => runAgent({ ...params, config, queryFn });
 }
 
-// Input summary for a trace step: prefer the payload the user would
-// recognize (the SQL text, the table, the chart title) over raw JSON. Sent
-// near-full so a UI can offer expand-to-read; display truncation is the
-// renderer's job.
-const STEP_DETAIL_MAX = 2000;
-function stepDetail(input: Record<string, unknown> | undefined): string | undefined {
-  if (!input) return undefined;
-  const pick = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
-  const detail =
-    (pick(input.title) ? `${pick(input.chart_type) ?? "chart"} · ${pick(input.title)}` : undefined) ??
-    pick(input.query) ??
-    pick(input.sql) ??
-    pick(input.table) ??
-    (Object.keys(input).length ? JSON.stringify(input) : undefined);
-  if (!detail) return undefined;
-  return detail.length > STEP_DETAIL_MAX ? `${detail.slice(0, STEP_DETAIL_MAX)}…` : detail;
-}
+

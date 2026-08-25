@@ -19,7 +19,7 @@ for await (const event of analytics.ask("which features have the most denials?")
 ```
 
 This package is small on purpose. The heavy lifting lives behind two seams:
-the agent harness (replaceable, Claude Agent SDK by default) and the contract
+the agent harness (you pick and pass one; none is built in) and the contract
 layer (`@infino-ai/analytics-core`: `VizSpec`, `ChatEvent`, `execute()`).
 Consumers only ever need this package; the types below are re-exported from it.
 
@@ -29,7 +29,7 @@ Consumers only ever need this package; the types below are re-exported from it.
 |---|---|
 | An Infino database | Infino Cloud (`https://api.platform.infino.ws/<database>`) with your data already ingested (see `ingestion/` at the repo root for example loaders) |
 | Infino API key | `config.infino.apiKey`, or the `INFINO_API_KEY` environment variable |
-| Anthropic API key | `config.llm.anthropicApiKey`, or `ANTHROPIC_API_KEY`. Needed only for `ask()`; the visualization API never touches an LLM |
+| An LLM credential | Whatever the harness you construct needs — `ANTHROPIC_API_KEY` for `createClaudeHarness`, `OPENAI_API_KEY` for `createOpenAIHarness`. Needed only for `ask()`; the visualization API never touches an LLM |
 
 ## Configuration
 
@@ -41,18 +41,30 @@ new Analytics(config: AnalyticsConfig)
 |---|---|---|---|
 | `infino.uri` | `string` | required | Database URI: `https://<host>/<database>` |
 | `infino.apiKey` | `string?` | `INFINO_API_KEY` | Bearer key for the database |
-| `llm.model` | `string?` | `claude-opus-5` | Anthropic model id used by the default harness |
-| `llm.anthropicApiKey` | `string?` | `ANTHROPIC_API_KEY` | LLM credential |
-| `llm.maxBudgetUsd` | `number?` | `2` | Hard spend ceiling per question; the run stops with an `error` event if it would exceed this |
-| `llm.maxTurns` | `number?` | `25` | Ceiling on tool-use round trips per question. Raise it for workloads that legitimately need long runs (exhaustive enumeration, corpus-wide verification); the defaults suit interactive chat |
-| `domainContext` | `string?` | none | Operator notes about the dataset: business definitions, reference tables (for example a topic taxonomy table), naming conventions. The agent treats these as ground truth when deciding what a concept means in this deployment, instead of inventing its own definition |
+| `harness` | `AgentHarness?` | none | The LLM: any generator of `ChatEvent`s. Construct one from a harness package and pass it — model, credential, ceilings and `domainContext` are its config, not this class's. See Swapping the harness below |
 | `storage` | `StorageAdapter?` | `InMemoryStorage` | Where threads live. Pass `SqliteStorage` (from `@infino-ai/analytics-storage-sqlite`) or your own adapter; see Threads and persistence below |
 
-`llm` as a whole is optional: leave it out entirely if a deployment only uses
-the non-conversational surfaces.
+`harness` is optional, and there is no default: this class names no provider and
+depends on none, so a deployment installs only the one it picked. Leave it out
+if you only use the visualization and dashboard surfaces — they never touch an
+LLM. `ask()` throws if it is missing.
 
-`domainContext` is the highest-leverage config field for answer quality on
-domain-specific data. Most "wrong" answers on real datasets are definitional
+```ts
+import { createClaudeHarness } from "@infino-ai/analytics-agent-claude";
+
+new Analytics({
+  infino: { uri: process.env.INFINO_URI! },
+  harness: createClaudeHarness({
+    infino: { uri: process.env.INFINO_URI! },
+    maxBudgetUsd: 2,
+    maxTurns: 25,
+    domainContext: "…",
+  }),
+});
+```
+
+`domainContext` — a field on every harness's config — is the highest-leverage
+setting for answer quality on domain-specific data. Most "wrong" answers on real datasets are definitional
 (the agent picked a reasonable definition that is not the house one); a few
 lines here, or a pointer to a definitions table in the database, aligns it:
 
@@ -61,6 +73,50 @@ domainContext: `Topic definitions live in the "topics" table (one row per
 topic: name + description). When a question maps to a topic, read its
 definition first and match conversations against it.`
 ```
+
+> **Breaking change:** the `llm` and `domainContext` config fields are gone.
+> They configured a built-in Claude default that no longer exists — pass a
+> `harness` you built yourself, with that config on it. This is what lets a
+> deployment carry one provider instead of both.
+
+## Swapping the harness
+
+```ts
+import { createOpenAIHarness } from "@infino-ai/analytics-agent-openai";
+
+const analytics = new Analytics({
+  infino: { uri },
+  harness: createOpenAIHarness({ infino: { uri } }),
+});
+```
+
+An `AgentHarness` is `(params) => AsyncGenerator<ChatEvent, {sessionId?}>` and
+nothing more. Writing your own: implement that, reuse `buildSystemPrompt`,
+`runCreateChart`, `stepDetail`, and `drain` from `@infino-ai/analytics-core`,
+and assert it with `assertHarnessConformance` from
+`@infino-ai/analytics-core/conformance`.
+
+### Choosing between the bundled two
+
+Both satisfy the same contract, so the UI and the persistence API cannot tell
+them apart. They are not equivalent in what they give you.
+
+| | `claude` | `openai` |
+|---|---|---|
+| Provider | Anthropic, via the Claude Agent SDK | Any OpenAI Responses endpoint — `api.openai.com`, Azure OpenAI / AI Foundry |
+| Spend ceiling | `maxBudgetUsd`, enforced in real dollars | `maxTotalTokens`, a proxy checked **between turns** — a single runaway turn is unbounded |
+| `done.costUsd` | reported | omitted; the API bills tokens, not dollars |
+| `summary` event | emitted | never — the Responses API has no second copy of the final text |
+| Web search | yes (`WebSearch`/`WebFetch`) | no; the system prompt drops that promise |
+| Long threads | SDK compacts context automatically | **no compaction** — server-side history grows until the model's limit, then the turn fails |
+| Large tool results | SDK truncates before they reach the model | **unbounded** — a wide `infino_sql` can exhaust context (`create_chart` is safe: the model gets a 5-row receipt) |
+| Built-in tools | ships Bash/file I/O, so a deny list is mandatory | none; the model sees exactly the tools you pass |
+
+Read the last three rows together. The Claude harness is more robust on long
+or data-heavy conversations because the SDK is doing work we have not
+reimplemented. The OpenAI harness is safer by construction, because there is
+no ambient tool surface to lock down. Pick accordingly, and treat the two
+"unbounded" rows as known limitations rather than settled design.
 
 ## Methods
 
@@ -163,17 +219,19 @@ ignore types they don't handle; new event types may be added over time.
 | `delta` | `text` | A streamed text chunk of the message being written. Superseded by the next `progress`/`summary`, which carries the complete text |
 | `progress` | `text` | A complete intermediate text block (the agent narrating its work) |
 | `sql` | `query` | The exact SQL behind the chart that follows. Show it for transparency/copy |
-| `data` | `columns`, `rows`, `truncated` | A raw result set surfaced without a chart |
 | `chart` | `spec`, `result` | A rendered figure: the `VizSpec` plus the executed `ExecuteResult` (full rows ride this event, not the model's context) |
-| `summary` | `text` | The final answer, in GitHub-flavored markdown |
+| `summary` | `text` | The final answer, in GitHub-flavored markdown. Not every harness emits it — treat it as a `progress` that happens to be last |
 | `error` | `message` | Something failed (budget exceeded, engine unreachable). A `done` still follows |
-| `done` | `sessionId`, `turns?`, `costUsd?` | Always the last event. `costUsd` is the LLM spend for this question |
+| `done` | `sessionId`, `turns?`, `costUsd?` | Always the last event. `costUsd` is the LLM spend for this question, when the provider reports cost at all |
 
 A typical successful run looks like:
 
 ```
 status → progress → step → step_done → … → sql → chart → summary → done
 ```
+
+Only `done` is guaranteed, and only as the last event. Switch on `type` and
+ignore the rest; that is what keeps a UI working across harnesses.
 
 ## Rendering charts: the binding contract
 

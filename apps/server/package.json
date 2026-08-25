@@ -9,6 +9,8 @@
   "dependencies": {
     "@hono/node-server": "^1.13.0",
     "@infino-ai/analytics": "*",
+    "@infino-ai/analytics-agent-claude": "*",
+    "@infino-ai/analytics-agent-openai": "*",
     "@infino-ai/analytics-storage-sqlite": "*",
     "hono": "^4.6.0"
   }

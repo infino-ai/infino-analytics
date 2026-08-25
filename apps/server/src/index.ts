@@ -32,10 +32,8 @@ import { join, dirname, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
-import { Analytics } from "@infino-ai/analytics";
+import { Analytics, type AgentHarness } from "@infino-ai/analytics";
 import { SqliteStorage } from "@infino-ai/analytics-storage-sqlite";
-
-const PORT = Number(process.env.PORT ?? 8787);
 
 function requireEnv(name: string): string {
   const v = process.env[name];
@@ -46,19 +44,75 @@ function requireEnv(name: string): string {
   return v;
 }
 
+// Ceilings and ports must fail at boot, not at the first question. Number()
+// yields NaN for a typo and 0 for "0"; both survive `?? DEFAULT` — NaN makes
+// every `turn > maxTurns` check false, 0 fails every question at turn 1.
+function numberEnv(name: string): number | undefined {
+  const v = process.env[name];
+  if (!v) return undefined;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0) {
+    console.error(`${name} must be a positive number (got ${v})`);
+    process.exit(1);
+  }
+  return n;
+}
+
+const PORT = numberEnv("PORT") ?? 8787;
+
 // The storage seam, wired: this line decides where app state lives. Swap
 // in your own StorageAdapter (your database) without touching anything
 // below; the reference implementation is a local SQLite file.
 const storage = new SqliteStorage({ path: process.env.FINO_DB ?? "./data/analytics.db" });
 
+// The LLM seam, wired: this app is the only thing that names a provider, so
+// the facade holds no default and no provider dependency. Adding a harness is
+// one entry below plus one line in .env.example.
+const INFINO_URI = requireEnv("INFINO_URI");
+
+// Shared by whichever harness runs: dataset notes and the turn ceiling mean
+// the same thing to both. The cost ceilings do not, so they live per entry.
+const DOMAIN_CONTEXT = process.env.FINO_DOMAIN_CONTEXT;
+const MAX_TURNS = numberEnv("FINO_MAX_TURNS");
+
+// Peers, and the only place either provider is named. Each entry owns its
+// own env block, so a knob reaches exactly the harness that understands it —
+// dollars for Claude, tokens for OpenAI. Both imports are dynamic, so the
+// unselected provider is never loaded, and a fork that deletes one package
+// deletes its entry here and carries no trace of it.
+const HARNESSES: Record<string, () => Promise<AgentHarness>> = {
+  claude: async () =>
+    (await import("@infino-ai/analytics-agent-claude")).createClaudeHarness({
+      infino: { uri: INFINO_URI },
+      model: process.env.FINO_MODEL,
+      maxTurns: MAX_TURNS,
+      maxBudgetUsd: numberEnv("FINO_MAX_BUDGET_USD"),
+      domainContext: DOMAIN_CONTEXT,
+    }),
+  openai: async () =>
+    (await import("@infino-ai/analytics-agent-openai")).createOpenAIHarness({
+      infino: { uri: INFINO_URI },
+      maxTurns: MAX_TURNS,
+      maxTotalTokens: numberEnv("FINO_MAX_TOTAL_TOKENS"),
+      domainContext: DOMAIN_CONTEXT,
+    }),
+};
+
+// Mandatory, with no fallback: a default would make one provider the implicit
+// answer, which is the privilege the peer layout exists to remove. One guard
+// covers unset, empty, and unknown, and always names the vocabulary.
+// hasOwn, not `in`: `in` walks the prototype, so FINO_HARNESS=toString would
+// pass and yield a harness that is not a function.
+const selected = process.env.FINO_HARNESS;
+if (!selected || !Object.hasOwn(HARNESSES, selected)) {
+  const have = Object.keys(HARNESSES).join(", ");
+  console.error(`FINO_HARNESS must be one of: ${have}${selected ? ` (got ${selected})` : " (not set)"}`);
+  process.exit(1);
+}
+
 const analytics = new Analytics({
-  infino: { uri: requireEnv("INFINO_URI") },
-  llm: {
-    model: process.env.FINO_MODEL,
-    maxTurns: process.env.FINO_MAX_TURNS ? Number(process.env.FINO_MAX_TURNS) : undefined,
-    maxBudgetUsd: process.env.FINO_MAX_BUDGET_USD ? Number(process.env.FINO_MAX_BUDGET_USD) : undefined,
-  },
-  domainContext: process.env.FINO_DOMAIN_CONTEXT,
+  infino: { uri: INFINO_URI },
+  harness: await HARNESSES[selected](),
   storage,
 });
 

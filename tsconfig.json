@@ -5,6 +5,9 @@
   },
   "include": [
     "packages/*/src/**/*.ts",
+    "packages/*/test/**/*.ts",
+    "packages/agents/*/src/**/*.ts",
+    "packages/agents/*/test/**/*.ts",
     "apps/server/src/**/*.ts"
   ]
 }
