@@ -1,6 +1,6 @@
 import { deepStrictEqual, ok, strictEqual } from "node:assert/strict";
 import { describe, it } from "node:test";
-import type { ChatEvent } from "./events.js";
+import { STEP_RESULT_MAX, type ChatEvent } from "./events.js";
 import type { AgentHarness } from "./harness.js";
 
 // The harness contract, as an executable spec. Every rule here is behavioural
@@ -89,6 +89,20 @@ export function assertHarnessConformance(name: string, scenarios: ConformanceSce
         if (event.type !== "step_done") continue;
         const openedAt = events.findIndex((e) => e.type === "step" && e.id === event.id);
         ok(openedAt !== -1 && openedAt < i, `step_done ${event.id} arrived before its step`);
+      }
+    });
+
+    // step_done events are persisted with the transcript; an unbounded tool
+    // result would store every wide query twice.
+    it("bounds the result it attaches to a step", async () => {
+      const { events } = await run(scenarios.callsTool());
+      for (const event of only(events, "step_done")) {
+        if (event.result === undefined) continue;
+        strictEqual(typeof event.result, "string", `step_done ${event.id}: result must be text`);
+        ok(
+          event.result.length <= STEP_RESULT_MAX + 1,
+          `step_done ${event.id}: result exceeds STEP_RESULT_MAX (${event.result.length})`,
+        );
       }
     });
 
