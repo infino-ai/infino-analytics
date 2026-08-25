@@ -74,10 +74,16 @@ Break any of these and consumers break with you.
   (`analytics-core/src/execute.ts`), the tool description intuition
   (`analytics-core/src/chart-tool.ts`), and the option builder
   (`analytics/src/echarts.ts`).
-- **Degrade, never fail.** Execute problems become machine-readable
-  `warnings` and `filters_skipped` entries while the data still returns;
-  renderers fall back to a table when a binding cannot resolve. Do not turn
-  these paths into thrown errors.
+- **Degrade, never fail — at execute time.** Problems found while running a
+  query become machine-readable `warnings` and `filters_skipped` entries
+  while the data still returns; renderers fall back to a table when a
+  binding cannot resolve. Do not turn these paths into thrown errors.
+  Malformed *arguments* are the other half and behave the opposite way: a
+  filter whose operator is not in `FilterSchema` is rejected where it enters
+  (the facade parses request filters; saved ones were parsed on write), so
+  the caller gets the vocabulary back — a 400 over HTTP. Degrading there
+  would mean silently ignoring what the caller asked for, and the receipt
+  would blame the query for a bad argument.
 - **`ChatEvent` is the harness contract** (`analytics-core/src/events.ts`).
   A replacement LLM harness is any generator yielding these events; the
   facade, server, and UI must keep working with nothing but the events.
