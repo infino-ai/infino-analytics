@@ -35,8 +35,6 @@ import { serve } from "@hono/node-server";
 import { Analytics, type AgentHarness } from "@infino-ai/analytics";
 import { SqliteStorage } from "@infino-ai/analytics-storage-sqlite";
 
-const PORT = Number(process.env.PORT ?? 8787);
-
 function requireEnv(name: string): string {
   const v = process.env[name];
   if (!v) {
@@ -46,18 +44,21 @@ function requireEnv(name: string): string {
   return v;
 }
 
-// A misspelled ceiling must fail at boot: Number("lots") is NaN, and NaN
-// survives `?? DEFAULT`, so every later `turn > maxTurns` check is false.
+// Ceilings and ports must fail at boot, not at the first question. Number()
+// yields NaN for a typo and 0 for "0"; both survive `?? DEFAULT` — NaN makes
+// every `turn > maxTurns` check false, 0 fails every question at turn 1.
 function numberEnv(name: string): number | undefined {
   const v = process.env[name];
   if (!v) return undefined;
   const n = Number(v);
-  if (!Number.isFinite(n)) {
-    console.error(`${name} must be a number (got ${v})`);
+  if (!Number.isFinite(n) || n <= 0) {
+    console.error(`${name} must be a positive number (got ${v})`);
     process.exit(1);
   }
   return n;
 }
+
+const PORT = numberEnv("PORT") ?? 8787;
 
 // The storage seam, wired: this line decides where app state lives. Swap
 // in your own StorageAdapter (your database) without touching anything
