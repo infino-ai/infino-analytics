@@ -65,62 +65,53 @@ const PORT = numberEnv("PORT") ?? 8787;
 // below; the reference implementation is a local SQLite file.
 const storage = new SqliteStorage({ path: process.env.FINO_DB ?? "./data/analytics.db" });
 
-// The LLM seam, wired: the app picks the harness, so the facade keeps only
-// its Claude default and never pulls a second provider's SDK. Imports are
-// dynamic so an unselected harness costs nothing at boot — adding one is a
-// single entry here.
+// The LLM seam, wired: this app is the only thing that names a provider, so
+// the facade holds no default and no provider dependency. Adding a harness is
+// one entry below plus one line in .env.example.
 const INFINO_URI = requireEnv("INFINO_URI");
 
-// Dataset notes and the turn ceiling are harness-agnostic: whichever one runs,
-// it gets them. FINO_MAX_BUDGET_USD is not — only Claude bills in dollars.
+// Shared by whichever harness runs: dataset notes and the turn ceiling mean
+// the same thing to both. The cost ceilings do not, so they live per entry.
 const DOMAIN_CONTEXT = process.env.FINO_DOMAIN_CONTEXT;
 const MAX_TURNS = numberEnv("FINO_MAX_TURNS");
 
-// `claude` maps to null, not a factory: it is the facade's built-in default,
-// so selecting it means passing no harness at all. It still has to be a real
-// entry — .env.example documents it, and this table is the vocabulary the
-// unknown-harness error reports.
-const HARNESSES: Record<string, (() => Promise<AgentHarness>) | null> = {
-  claude: null,
+// Peers, and the only place either provider is named. Each entry owns its
+// own env block, so a knob reaches exactly the harness that understands it —
+// dollars for Claude, tokens for OpenAI. Both imports are dynamic, so the
+// unselected provider is never loaded, and a fork that deletes one package
+// deletes its entry here and carries no trace of it.
+const HARNESSES: Record<string, () => Promise<AgentHarness>> = {
+  claude: async () =>
+    (await import("@infino-ai/analytics-agent-claude")).createClaudeHarness({
+      infino: { uri: INFINO_URI },
+      model: process.env.FINO_MODEL,
+      maxTurns: MAX_TURNS,
+      maxBudgetUsd: numberEnv("FINO_MAX_BUDGET_USD"),
+      domainContext: DOMAIN_CONTEXT,
+    }),
   openai: async () =>
     (await import("@infino-ai/analytics-agent-openai")).createOpenAIHarness({
       infino: { uri: INFINO_URI },
-      domainContext: DOMAIN_CONTEXT,
       maxTurns: MAX_TURNS,
+      maxTotalTokens: numberEnv("FINO_MAX_TOTAL_TOKENS"),
+      domainContext: DOMAIN_CONTEXT,
     }),
 };
 
-const selected = process.env.FINO_HARNESS;
+const DEFAULT_HARNESS = "claude";
+// `||`, not `??`: a bare `FINO_HARNESS=` in a .env is an empty string, which
+// `??` would pass through to the guard as an unknown harness.
+const selected = process.env.FINO_HARNESS || DEFAULT_HARNESS;
 // hasOwn, not `in`: `in` walks the prototype, so FINO_HARNESS=toString would
 // pass the guard and yield a harness that is not a function.
-if (selected && !Object.hasOwn(HARNESSES, selected)) {
+if (!Object.hasOwn(HARNESSES, selected)) {
   console.error(`FINO_HARNESS=${selected} is unknown (have: ${Object.keys(HARNESSES).join(", ")})`);
   process.exit(1);
 }
-// Unselected, or claude → undefined → the facade's built-in default.
-const harness = selected ? await HARNESSES[selected]?.() : undefined;
 
-// One .env usually carries both harnesses' settings so operators can flip
-// FINO_HARNESS. Warn rather than exit — but never let a spend ceiling look
-// enforced when the selected harness bounds tokens instead.
-if (harness && process.env.FINO_MAX_BUDGET_USD) {
-  console.warn(`FINO_MAX_BUDGET_USD is ignored by the ${selected} harness (it bounds tokens)`);
-}
-
-// llm tunes the built-in default; a selected harness replaces it. Passing
-// both is rejected, so send exactly one.
 const analytics = new Analytics({
   infino: { uri: INFINO_URI },
-  ...(harness
-    ? { harness }
-    : {
-        llm: {
-          model: process.env.FINO_MODEL,
-          maxTurns: MAX_TURNS,
-          maxBudgetUsd: numberEnv("FINO_MAX_BUDGET_USD"),
-        },
-        domainContext: DOMAIN_CONTEXT,
-      }),
+  harness: await HARNESSES[selected](),
   storage,
 });
 

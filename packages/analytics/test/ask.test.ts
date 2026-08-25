@@ -33,39 +33,23 @@ const assistantEvents = (messages: StoredMessage[]) =>
   messages.flatMap((m) => (m.role === "assistant" ? m.events : []));
 
 describe("Analytics config", () => {
-  it("accepts a harness alone", () => {
+  const bare = () => new Analytics({ infino: { uri: "https://example.test/db", apiKey: "test" } });
+
+  it("accepts a harness", () => {
     analytics(fakeHarness([]));
   });
 
-  it("accepts llm alone", () => {
-    new Analytics({ infino: { uri: "https://example.test/db", apiKey: "test" }, llm: { model: "x" } });
+  // The facade names no provider and holds no default, so the LLM is genuinely
+  // optional — a deployment that only persists and renders never builds one.
+  it("accepts no harness at all", () => {
+    const a = bare();
+    ok(a.visualizations);
+    ok(a.dashboards);
   });
 
-  it("accepts domainContext alongside the built-in harness", () => {
-    new Analytics({
-      infino: { uri: "https://example.test/db", apiKey: "test" },
-      domainContext: "Topic definitions live in `topics`.",
-    });
+  it("fails ask() loudly when no harness was passed", async () => {
+    await rejects(() => drain(bare().ask("anything")), /needs a harness/);
   });
-
-  // Silently ignoring any of them is how a deployment runs the wrong model,
-  // or quietly loses its domain notes.
-  for (const [label, extra] of [
-    ["llm", { llm: { model: "x" } }],
-    ["domainContext", { domainContext: "notes" }],
-  ] as const) {
-    it(`refuses ${label} together with harness`, () => {
-      throws(
-        () =>
-          new Analytics({
-            infino: { uri: "https://example.test/db", apiKey: "test" },
-            ...extra,
-            harness: fakeHarness([]),
-          }),
-        /not both/,
-      );
-    });
-  }
 });
 
 describe("Analytics.ask", () => {

@@ -8,7 +8,6 @@
     "./echarts": "./src/echarts.ts"
   },
   "dependencies": {
-    "@infino-ai/analytics-agent-claude": "*",
     "@infino-ai/analytics-core": "*"
   }
 }

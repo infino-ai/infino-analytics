@@ -1,4 +1,3 @@
-import { createClaudeHarness } from "@infino-ai/analytics-agent-claude";
 import {
   DashboardSchema,
   FilterSchema,
@@ -65,19 +64,11 @@ export interface AnalyticsConfig {
   /** Infino target: hosted https://<host>/<database>. The apiKey falls back
    * to INFINO_API_KEY. */
   infino: { uri: string; apiKey?: string };
-  /** Tuning for the BUILT-IN default harness (Claude Agent SDK) — needed only
-   * by the conversational surface; the visualization/dashboard surfaces never
-   * touch it. Mutually exclusive with `harness`, which replaces the default
-   * outright. The key falls back to ANTHROPIC_API_KEY. */
-  llm?: { model?: string; apiKey?: string; maxBudgetUsd?: number; maxTurns?: number };
-  /** Operator-supplied notes about the dataset — business definitions,
-   * reference tables (e.g. a topic taxonomy), naming conventions. The agent
-   * treats these as ground truth when choosing how to define and match
-   * concepts, instead of inventing its own definitions. Configures the
-   * built-in harness; a replacement `harness` takes its own. */
-  domainContext?: string;
-  /** Replace the LLM entirely: any generator of ChatEvents. Peer harnesses
-   * live in `packages/agents/`. */
+  /** The LLM seam: any generator of ChatEvents. Harnesses are peers under
+   * `packages/agents/`; construct one and pass it, model and dataset notes
+   * included — this class holds no provider config and no default, so a
+   * deployment installs only the provider it picked. Optional because the
+   * visualization and dashboard surfaces never touch it; only `ask` does. */
   harness?: AgentHarness;
   /** Storage seam. Defaults to InMemoryStorage (nothing survives a
    * restart); pass SqliteStorage or your own StorageAdapter for
@@ -164,7 +155,7 @@ export interface Dashboards {
  *   backend.
  */
 export class Analytics {
-  private readonly harness: AgentHarness;
+  private readonly harness?: AgentHarness;
   private readonly storage: StorageAdapter;
   private readonly client: InfinoClient;
 
@@ -178,24 +169,7 @@ export class Analytics {
   readonly dashboards: Dashboards;
 
   constructor(config: AnalyticsConfig) {
-    // Silently dropping any of these is how a deployment ends up running a
-    // model nobody configured, or losing its domain notes. Refuse instead.
-    if (config.harness && (config.llm || config.domainContext !== undefined)) {
-      throw new Error(
-        "pass either llm/domainContext (which configure the built-in Claude harness) " +
-          "or harness (which replaces it), not both",
-      );
-    }
-    this.harness =
-      config.harness ??
-      createClaudeHarness({
-        infino: config.infino,
-        model: config.llm?.model,
-        anthropicApiKey: config.llm?.apiKey,
-        maxBudgetUsd: config.llm?.maxBudgetUsd,
-        maxTurns: config.llm?.maxTurns,
-        domainContext: config.domainContext,
-      });
+    this.harness = config.harness;
     this.storage = config.storage ?? new InMemoryStorage();
     this.threads = this.storage.threads;
     this.client = new InfinoClient(config.infino);
@@ -217,6 +191,10 @@ export class Analytics {
     question: string,
     opts: { threadId?: string; signal?: AbortSignal } = {},
   ): AsyncGenerator<ChatEvent> {
+    // The data-plane surfaces work without a harness; this one cannot.
+    if (!this.harness) {
+      throw new Error("ask() needs a harness: pass one as new Analytics({harness})");
+    }
     const thread = opts.threadId ? await this.threads.get(opts.threadId) : null;
     if (opts.threadId && !thread) {
       throw new Error(`unknown thread: ${opts.threadId}`);

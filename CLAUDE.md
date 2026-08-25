@@ -19,12 +19,12 @@ The server needs `INFINO_URI` (https://<host>/<database>), `INFINO_API_KEY`,
 and `ANTHROPIC_API_KEY`. Optional: `FINO_MODEL`, `FINO_DB` (SQLite path),
 `FINO_SUGGESTIONS` (pipe-separated question chips), `FINO_DOMAIN_CONTEXT`
 (operator notes about the dataset, appended to the agent's system prompt),
-`FINO_MAX_TURNS` / `FINO_MAX_BUDGET_USD` (per-question agent ceilings),
-`PORT`. `FINO_HARNESS=openai` swaps in the OpenAI harness, which needs
-`OPENAI_BASE_URL`, `OPENAI_API_KEY`, and `OPENAI_MODEL` instead of
-`ANTHROPIC_API_KEY`. `FINO_DOMAIN_CONTEXT` and `FINO_MAX_TURNS` apply to
-either harness; `FINO_MAX_BUDGET_USD` only to Claude, which is the one that
-bills in dollars.
+`FINO_MAX_TURNS` (per-question turn ceiling), `PORT`. `FINO_HARNESS` picks the
+harness (`claude`, the default, or `openai`); `openai` needs `OPENAI_BASE_URL`,
+`OPENAI_API_KEY`, and `OPENAI_MODEL` instead of `ANTHROPIC_API_KEY`.
+`FINO_DOMAIN_CONTEXT` and `FINO_MAX_TURNS` reach either harness. The cost
+ceiling does not: `FINO_MAX_BUDGET_USD` is Claude's (it bills dollars) and
+`FINO_MAX_TOTAL_TOKENS` is OpenAI's (it bills tokens).
 
 `npm test` covers the pure logic (filters, execute/binding, mergePatch,
 toEChartsOption, the ask() seam, the OpenAI stream mapper and turn loop) plus
@@ -52,11 +52,13 @@ apps/web                    demo UI (React + Vite + Tailwind + ECharts)
 ingestion/                  example bulk loader (REST, run once)
 ```
 
-Dependency direction: `analytics -> agents/claude -> analytics-core`, and the
-storage and harness packages depend only on `analytics-core`.
-Never invert these. `analytics` defaults to the Claude harness, so only the
-app picks a different one — that is what keeps a second provider's SDK out
-of the facade's dependency graph.
+Dependency direction: `analytics -> analytics-core`, and the storage and
+harness packages depend only on `analytics-core`. Never invert these.
+`analytics` depends on NO harness package and has no default: `apps/server`
+is the only place a provider is named, behind a dynamic import per entry in
+`HARNESSES`. That is what lets a deployment carry one provider instead of
+both — an OpenAI-only fork deletes `packages/agents/claude`, its `apps/server`
+dependency, and its `HARNESSES` entry, and nothing else changes.
 
 ## Load-bearing contracts
 
@@ -93,8 +95,11 @@ Break any of these and consumers break with you.
 - **Storage is a seam.** Consumers type against `StorageAdapter` only; a
   new database is a new adapter package, not edits to consumers.
 - **Harnesses are peers under `packages/agents/`**, mirroring `storage-*`:
-  `<seam>-<implementation>`. Neither is privileged; `analytics` defaults to
-  Claude only because something must be the default.
+  `<seam>-<implementation>`. Neither is privileged and neither is a default:
+  `analytics` names no provider, and `apps/server` picks one from `HARNESSES`
+  (`FINO_HARNESS`, defaulting to `claude`). Each entry owns its own env block,
+  so a knob only reaches the harness that understands it — never add a
+  provider dependency or a provider import to `analytics`.
 - **The OpenAI harness diverges deliberately** (`agents/openai/src/index.ts`):
   no `done.costUsd` (the API bills tokens, not dollars — the ceiling is
   `maxTotalTokens`), no `summary` event (the Responses API has no second copy

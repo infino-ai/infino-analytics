@@ -29,7 +29,7 @@ Consumers only ever need this package; the types below are re-exported from it.
 |---|---|
 | An Infino database | Infino Cloud (`https://api.platform.infino.ws/<database>`) with your data already ingested (see `ingestion/` at the repo root for example loaders) |
 | Infino API key | `config.infino.apiKey`, or the `INFINO_API_KEY` environment variable |
-| An LLM credential | `config.llm.apiKey`, or `ANTHROPIC_API_KEY` for the default harness. Needed only for `ask()`; the visualization API never touches an LLM |
+| An LLM credential | Whatever the harness you construct needs — `ANTHROPIC_API_KEY` for `createClaudeHarness`, `OPENAI_API_KEY` for `createOpenAIHarness`. Needed only for `ask()`; the visualization API never touches an LLM |
 
 ## Configuration
 
@@ -41,25 +41,30 @@ new Analytics(config: AnalyticsConfig)
 |---|---|---|---|
 | `infino.uri` | `string` | required | Database URI: `https://<host>/<database>` |
 | `infino.apiKey` | `string?` | `INFINO_API_KEY` | Bearer key for the database |
-| `llm.model` | `string?` | `claude-opus-5` | Model id for the built-in harness |
-| `llm.apiKey` | `string?` | `ANTHROPIC_API_KEY` | Credential for the built-in harness |
-| `llm.maxBudgetUsd` | `number?` | `2` | Hard spend ceiling per question; the run stops with an `error` event if it would exceed this |
-| `llm.maxTurns` | `number?` | `25` | Ceiling on tool-use round trips per question. Raise it for workloads that legitimately need long runs (exhaustive enumeration, corpus-wide verification); the defaults suit interactive chat |
-| `domainContext` | `string?` | none | Operator notes about the dataset: business definitions, reference tables (for example a topic taxonomy table), naming conventions. The agent treats these as ground truth when deciding what a concept means in this deployment, instead of inventing its own definition |
-| `harness` | `AgentHarness?` | Claude Agent SDK | Replaces the LLM entirely — any generator of `ChatEvent`s. See Swapping the harness below |
+| `harness` | `AgentHarness?` | none | The LLM: any generator of `ChatEvent`s. Construct one from a harness package and pass it — model, credential, ceilings and `domainContext` are its config, not this class's. See Swapping the harness below |
 | `storage` | `StorageAdapter?` | `InMemoryStorage` | Where threads live. Pass `SqliteStorage` (from `@infino-ai/analytics-storage-sqlite`) or your own adapter; see Threads and persistence below |
 
-`llm` as a whole is optional: leave it out entirely if a deployment only uses
-the non-conversational surfaces.
+`harness` is optional, and there is no default: this class names no provider and
+depends on none, so a deployment installs only the one it picked. Leave it out
+if you only use the visualization and dashboard surfaces — they never touch an
+LLM. `ask()` throws if it is missing.
 
-`llm`/`domainContext` and `harness` are **mutually exclusive** — the first two
-configure the built-in harness, `harness` replaces it, so passing both throws at
-construction rather than silently ignoring one. A replacement harness takes its
-own `domainContext`:
-`createOpenAIHarness({ infino, domainContext })`.
+```ts
+import { createClaudeHarness } from "@infino-ai/analytics-agent-claude";
 
-`domainContext` is the highest-leverage config field for answer quality on
-domain-specific data. Most "wrong" answers on real datasets are definitional
+new Analytics({
+  infino: { uri: process.env.INFINO_URI! },
+  harness: createClaudeHarness({
+    infino: { uri: process.env.INFINO_URI! },
+    maxBudgetUsd: 2,
+    maxTurns: 25,
+    domainContext: "…",
+  }),
+});
+```
+
+`domainContext` — a field on every harness's config — is the highest-leverage
+setting for answer quality on domain-specific data. Most "wrong" answers on real datasets are definitional
 (the agent picked a reasonable definition that is not the house one); a few
 lines here, or a pointer to a definitions table in the database, aligns it:
 
@@ -69,8 +74,10 @@ topic: name + description). When a question maps to a topic, read its
 definition first and match conversations against it.`
 ```
 
-> **Breaking change:** `llm.anthropicApiKey` is now `llm.apiKey`. The facade is
-> provider-neutral; the provider is whichever harness you run.
+> **Breaking change:** the `llm` and `domainContext` config fields are gone.
+> They configured a built-in Claude default that no longer exists — pass a
+> `harness` you built yourself, with that config on it. This is what lets a
+> deployment carry one provider instead of both.
 
 ## Swapping the harness
 
