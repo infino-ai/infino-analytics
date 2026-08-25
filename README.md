@@ -106,7 +106,13 @@ The intended path, in the order most forks take it:
    stay untouched. `packages/agents/openai` is the worked example; run it
    with `FINO_HARNESS=openai`. A new harness must pass
    `assertHarnessConformance` — the contract's executable spec.
-5. **Put your gateway in front.** The reference server ships without
+5. **Then delete the harness you did not pick.** A fork answers with one
+   LLM, so carrying both means carrying a provider SDK you never call. Set
+   `FINO_HARNESS`, then remove the other `packages/agents/*` package, its
+   `apps/server` dependency, and its entry in `HARNESSES`. Dropping
+   `agents/openai` also drops the `openai` package that sets this repo's
+   Node 22.18 floor.
+6. **Put your gateway in front.** The reference server ships without
    auth on purpose.
 
 `CLAUDE.md` (root and `packages/analytics/`) orients coding agents working
