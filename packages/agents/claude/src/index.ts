@@ -61,9 +61,8 @@ const DEFAULT_MAX_BUDGET_USD = 2;
 
 export interface AgentConfig {
   infino: InfinoConfig;
-  /** Anthropic model id; the LLM seam's default harness is the Claude Agent
-   * SDK, so this is a Claude model. Swapping the harness replaces this file,
-   * not the tools or prompts. */
+  /** Anthropic model id — this harness is the Claude Agent SDK, so a Claude
+   * model. Swapping harnesses replaces this file, not the tools or prompts. */
   model?: string;
   maxTurns?: number;
   /** Per-question spend ceiling in USD (default 2). */

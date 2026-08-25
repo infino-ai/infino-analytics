@@ -98,14 +98,15 @@ const HARNESSES: Record<string, () => Promise<AgentHarness>> = {
     }),
 };
 
-const DEFAULT_HARNESS = "claude";
-// `||`, not `??`: a bare `FINO_HARNESS=` in a .env is an empty string, which
-// `??` would pass through to the guard as an unknown harness.
-const selected = process.env.FINO_HARNESS || DEFAULT_HARNESS;
+// Mandatory, with no fallback: a default would make one provider the implicit
+// answer, which is the privilege the peer layout exists to remove. One guard
+// covers unset, empty, and unknown, and always names the vocabulary.
 // hasOwn, not `in`: `in` walks the prototype, so FINO_HARNESS=toString would
-// pass the guard and yield a harness that is not a function.
-if (!Object.hasOwn(HARNESSES, selected)) {
-  console.error(`FINO_HARNESS=${selected} is unknown (have: ${Object.keys(HARNESSES).join(", ")})`);
+// pass and yield a harness that is not a function.
+const selected = process.env.FINO_HARNESS;
+if (!selected || !Object.hasOwn(HARNESSES, selected)) {
+  const have = Object.keys(HARNESSES).join(", ");
+  console.error(`FINO_HARNESS must be one of: ${have}${selected ? ` (got ${selected})` : " (not set)"}`);
   process.exit(1);
 }
 

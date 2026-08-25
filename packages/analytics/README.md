@@ -19,7 +19,7 @@ for await (const event of analytics.ask("which features have the most denials?")
 ```
 
 This package is small on purpose. The heavy lifting lives behind two seams:
-the agent harness (replaceable, Claude Agent SDK by default) and the contract
+the agent harness (you pick and pass one; none is built in) and the contract
 layer (`@infino-ai/analytics-core`: `VizSpec`, `ChatEvent`, `execute()`).
 Consumers only ever need this package; the types below are re-exported from it.
 
@@ -101,7 +101,7 @@ and assert it with `assertHarnessConformance` from
 Both satisfy the same contract, so the UI and the persistence API cannot tell
 them apart. They are not equivalent in what they give you.
 
-| | `claude` (default) | `openai` |
+| | `claude` | `openai` |
 |---|---|---|
 | Provider | Anthropic, via the Claude Agent SDK | Any OpenAI Responses endpoint — `api.openai.com`, Azure OpenAI / AI Foundry |
 | Spend ceiling | `maxBudgetUsd`, enforced in real dollars | `maxTotalTokens`, a proxy checked **between turns** — a single runaway turn is unbounded |

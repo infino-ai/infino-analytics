@@ -20,7 +20,7 @@ and `ANTHROPIC_API_KEY`. Optional: `FINO_MODEL`, `FINO_DB` (SQLite path),
 `FINO_SUGGESTIONS` (pipe-separated question chips), `FINO_DOMAIN_CONTEXT`
 (operator notes about the dataset, appended to the agent's system prompt),
 `FINO_MAX_TURNS` (per-question turn ceiling), `PORT`. `FINO_HARNESS` picks the
-harness (`claude`, the default, or `openai`); `openai` needs `OPENAI_BASE_URL`,
+harness and is required — `claude` or `openai`, no default. `openai` needs `OPENAI_BASE_URL`,
 `OPENAI_API_KEY`, and `OPENAI_MODEL` instead of `ANTHROPIC_API_KEY`.
 `FINO_DOMAIN_CONTEXT` and `FINO_MAX_TURNS` reach either harness. The cost
 ceiling does not: `FINO_MAX_BUDGET_USD` is Claude's (it bills dollars) and
@@ -39,8 +39,8 @@ running server.
 packages/analytics-core     contract layer: VizSpec, ChatEvent, execute(),
                             filter injection, StorageAdapter, AgentHarness,
                             the create_chart tool contract. No LLM SDK.
-packages/agents/claude      default harness: Claude Agent SDK event loop + the
-                            tool policy. Peer, not privileged.
+packages/agents/claude      Claude Agent SDK event loop + the tool policy.
+                            A peer, not a default.
 packages/agents/openai      OpenAI Responses API harness + its MCP client. Any
                             compatible deployment; selected by FINO_HARNESS.
 packages/storage-sqlite     reference StorageAdapter (one SQLite file)
@@ -96,8 +96,9 @@ Break any of these and consumers break with you.
   new database is a new adapter package, not edits to consumers.
 - **Harnesses are peers under `packages/agents/`**, mirroring `storage-*`:
   `<seam>-<implementation>`. Neither is privileged and neither is a default:
-  `analytics` names no provider, and `apps/server` picks one from `HARNESSES`
-  (`FINO_HARNESS`, defaulting to `claude`). Each entry owns its own env block,
+  `analytics` names no provider, and `apps/server` requires `FINO_HARNESS` to
+  name one from `HARNESSES` — booting without it is an error, because a
+  fallback would quietly make one provider the answer. Each entry owns its own env block,
   so a knob only reaches the harness that understands it — never add a
   provider dependency or a provider import to `analytics`.
 - **The OpenAI harness diverges deliberately** (`agents/openai/src/index.ts`):

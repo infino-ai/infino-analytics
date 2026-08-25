@@ -44,12 +44,12 @@ INFINO_API_KEY=... python3 ingestion/bulk_upload.py \
 
 # 2. Run the chat app
 INFINO_URI=https://api.platform.infino.ws/<database> \
-INFINO_API_KEY=... ANTHROPIC_API_KEY=... npm run dev
+INFINO_API_KEY=... FINO_HARNESS=claude ANTHROPIC_API_KEY=... npm run dev
 # → http://localhost:8787
+# FINO_HARNESS is required and has no default: "claude" needs
+# ANTHROPIC_API_KEY, "openai" needs the OPENAI_* block in .env.example.
 # Optional: FINO_SUGGESTIONS="q1|q2|q3" sets the suggested-question chips
 # for your dataset; without it, generic suggestions are shown.
-# Optional: FINO_HARNESS=openai runs the OpenAI Responses API instead of
-# Claude — see the OPENAI_* block in .env.example.
 ```
 
 Or use the facade directly in your own code:
@@ -69,7 +69,7 @@ for await (const event of analytics.ask("which features have the most denials?")
 ingestion/                example data-loading scripts (run once, before chat)
 packages/analytics-core   the contract layer: VizSpec, ChatEvent, StorageAdapter,
                           execute() → { columns, rows, binding, warnings } — no LLM
-packages/agents/claude    the default harness (Claude Agent SDK) + tool policy
+packages/agents/claude    the Claude Agent SDK harness + tool policy
 packages/agents/openai    the OpenAI Responses API over MCP; any compatible
                           deployment (api.openai.com, Azure OpenAI / Foundry)
 packages/storage-sqlite   the reference StorageAdapter: app state in one SQLite file
