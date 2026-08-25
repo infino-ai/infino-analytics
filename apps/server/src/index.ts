@@ -75,7 +75,12 @@ const INFINO_URI = requireEnv("INFINO_URI");
 const DOMAIN_CONTEXT = process.env.FINO_DOMAIN_CONTEXT;
 const MAX_TURNS = numberEnv("FINO_MAX_TURNS");
 
-const HARNESSES: Record<string, () => Promise<AgentHarness>> = {
+// `claude` maps to null, not a factory: it is the facade's built-in default,
+// so selecting it means passing no harness at all. It still has to be a real
+// entry — .env.example documents it, and this table is the vocabulary the
+// unknown-harness error reports.
+const HARNESSES: Record<string, (() => Promise<AgentHarness>) | null> = {
+  claude: null,
   openai: async () =>
     (await import("@infino-ai/analytics-agent-openai")).createOpenAIHarness({
       infino: { uri: INFINO_URI },
@@ -85,12 +90,14 @@ const HARNESSES: Record<string, () => Promise<AgentHarness>> = {
 };
 
 const selected = process.env.FINO_HARNESS;
-if (selected && !(selected in HARNESSES)) {
+// hasOwn, not `in`: `in` walks the prototype, so FINO_HARNESS=toString would
+// pass the guard and yield a harness that is not a function.
+if (selected && !Object.hasOwn(HARNESSES, selected)) {
   console.error(`FINO_HARNESS=${selected} is unknown (have: ${Object.keys(HARNESSES).join(", ")})`);
   process.exit(1);
 }
-// Unselected → undefined → the facade's built-in default.
-const harness = selected ? await HARNESSES[selected]() : undefined;
+// Unselected, or claude → undefined → the facade's built-in default.
+const harness = selected ? await HARNESSES[selected]?.() : undefined;
 
 // One .env usually carries both harnesses' settings so operators can flip
 // FINO_HARNESS. Warn rather than exit — but never let a spend ceiling look
