@@ -3,10 +3,9 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import type { FunctionTool } from "openai/resources/responses/responses";
 
-// The data tools, from the published @infino-ai/mcp-server over stdio — the
-// same binary the Claude harness spawns. The Claude SDK owned this child
-// process; here we own it, so every exit path must close the transport or a
-// question leaks a Node process.
+// The data tools, from the published @infino-ai/mcp-server over stdio. This
+// package owns the child process itself, so every exit path must close the
+// transport or a question leaks a Node process.
 
 export interface McpToolset {
   readonly tools: readonly FunctionTool[];

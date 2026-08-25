@@ -14,8 +14,8 @@ import type { ChatEvent } from "./events.js";
 // inflate its context.
 const MODEL_SAMPLE_ROWS = 5;
 
-/** Raw zod shape (not a z.object) — the Claude SDK's tool() takes it as-is,
- * and z.toJSONSchema(z.object(...)) turns it into a JSON Schema for others. */
+/** Raw zod shape (not a z.object) — a harness whose tool API accepts a shape
+ * passes it as-is; any other wraps it via z.toJSONSchema(z.object(...)). */
 export const CREATE_CHART_INPUT = {
   title: z.string().describe("Short human title for the chart"),
   chart_type: z

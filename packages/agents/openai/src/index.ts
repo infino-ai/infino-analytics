@@ -16,7 +16,8 @@ import { buildToolRegistry } from "./tools.js";
 // works — api.openai.com or an Azure OpenAI / AI Foundry resource — because
 // the only thing that varies is baseURL.
 //
-// Deliberate differences from the Claude harness, all invisible to consumers:
+// Parts of ChatEvent this harness deliberately leaves out, all optional and
+// all invisible to consumers:
 //   - `done.costUsd` is omitted. The API reports tokens, not cost, and a
 //     hardcoded price table rots; the ceiling is maxTotalTokens instead.
 //   - No `summary` event. The Responses API has no second copy of the final
@@ -24,8 +25,8 @@ import { buildToolRegistry } from "./tools.js";
 //   - No web search. The prompt drops that promise accordingly.
 
 const DEFAULT_MAX_TURNS = 25;
-// Insurance against a pathological run, in place of the Claude harness's
-// per-question USD ceiling.
+// Insurance against a pathological run. Token-denominated because that is what
+// this API bills; it is a cost proxy, not a currency ceiling.
 const DEFAULT_MAX_TOTAL_TOKENS = 400_000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 300_000;
 
@@ -41,8 +42,8 @@ export interface OpenAIConfig {
   /** Model id, or an Azure deployment name. Falls back to OPENAI_MODEL. */
   model?: string;
   /** Operator-supplied notes about the dataset, appended to the system prompt
-   * as ground truth. Dataset knowledge, so it applies here exactly as it does
-   * to the Claude harness. */
+   * as ground truth. Dataset knowledge rather than provider config, which is
+   * why every harness takes it. */
   domainContext?: string;
   maxTurns?: number;
   /** Cumulative billed tokens per question (default 400k). */
@@ -141,8 +142,8 @@ export function createOpenAIHarness(config: OpenAIConfig, seams: OpenAISeams = {
       yield { type: "done", sessionId: sessionId ?? "", turns: stats.turns };
     } catch (err) {
       yield* drain(pending);
-      // Cancellation is a normal outcome, not an error — same as the Claude
-      // harness, and the UI depends on it.
+      // Cancellation is a normal outcome, not an error: the ChatEvent contract
+      // requires abort to yield `done`, and assertHarnessConformance checks it.
       if (!abort.signal.aborted) {
         yield { type: "error", message: describe(err) };
       }

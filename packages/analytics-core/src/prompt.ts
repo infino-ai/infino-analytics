@@ -12,7 +12,8 @@
 
 export interface PromptCapabilities {
   /** The harness exposes a web-search tool, so the contract may promise it.
-   * Claude's does; a harness without one must not make the offer. */
+   * Set it only when the tool is really there — a harness without one must
+   * not make the offer. */
   webSearch?: boolean;
   /** Operator-supplied notes about the dataset — business definitions,
    * reference tables (e.g. a topic taxonomy), naming conventions. Appended as
