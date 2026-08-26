@@ -80,11 +80,11 @@ describe("Analytics.ask", () => {
       ]),
     );
     const thread = await a.threads.create();
-    await drain(a.ask("why the denials?", { threadId: thread.id }));
+    await drain(a.ask("why the events?", { threadId: thread.id }));
 
     const messages = await a.threads.listMessages(thread.id);
     strictEqual(messages.length, 2);
-    ok(messages[0].role === "user" && messages[0].text === "why the denials?");
+    ok(messages[0].role === "user" && messages[0].text === "why the events?");
     // status and delta are transient by contract.
     deepStrictEqual(
       assistantEvents(messages).map((e) => e.type),
@@ -95,8 +95,8 @@ describe("Analytics.ask", () => {
   it("titles a new thread from its first question", async () => {
     const a = analytics(fakeHarness([{ type: "done", sessionId: "s1" }]));
     const thread = await a.threads.create();
-    await drain(a.ask("why the denials?", { threadId: thread.id }));
-    strictEqual((await a.threads.get(thread.id))?.title, "why the denials?");
+    await drain(a.ask("why the events?", { threadId: thread.id }));
+    strictEqual((await a.threads.get(thread.id))?.title, "why the events?");
   });
 
   it("stores the harness session pointer and replays it on the next turn", async () => {

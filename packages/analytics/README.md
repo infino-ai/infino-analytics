@@ -12,7 +12,7 @@ const analytics = new Analytics({
   infino: { uri: "https://api.platform.infino.ws/<database>", apiKey: "..." },
 });
 
-for await (const event of analytics.ask("which features have the most denials?")) {
+for await (const event of analytics.ask("describe this dataset")) {
   if (event.type === "chart") render(event.spec, event.result);
   if (event.type === "summary") console.log(event.text);
 }
@@ -154,7 +154,7 @@ success, on error, and on abort.
 const threadId = await analytics.createSession();
 const abort = new AbortController();
 
-for await (const event of analytics.ask("top 10 users by denials", {
+for await (const event of analytics.ask("what are the trends over time?", {
   threadId,
   signal: abort.signal,
 })) {

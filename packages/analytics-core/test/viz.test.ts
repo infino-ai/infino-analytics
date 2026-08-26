@@ -6,8 +6,8 @@ import type { Visualization } from "../src/viz.js";
 const doc = (): Visualization =>
   newVisualization(
     NewVisualizationSchema.parse({
-      title: "Denials by day",
-      source: { kind: "sql", table: "denials", raw_query: "SELECT day, n FROM denials" },
+      title: "Events by day",
+      source: { kind: "sql", table: "events", raw_query: "SELECT day, n FROM events" },
       chart: { type: "bar" },
       mapping: { x: "day", y: ["n"] },
       tags: ["ops"],
@@ -19,7 +19,7 @@ describe("mergePatch", () => {
     const patched = mergePatch(doc(), { title: "Renamed", chart: { type: "line" } });
     strictEqual(patched.title, "Renamed");
     strictEqual(patched.chart.type, "line");
-    strictEqual(patched.source.table, "denials");
+    strictEqual(patched.source.table, "events");
   });
 
   it("removes a key when the patch value is null", () => {
@@ -57,6 +57,6 @@ describe("mergePatch", () => {
   it("leaves the original document untouched", () => {
     const base = doc();
     mergePatch(base, { title: "Renamed" });
-    strictEqual(base.title, "Denials by day");
+    strictEqual(base.title, "Events by day");
   });
 });

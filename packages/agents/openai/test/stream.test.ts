@@ -69,9 +69,9 @@ describe("createTurnMapper", () => {
 
   it("titles a create_chart step with its chart type", () => {
     const { out } = run([
-      callDone("c1", "create_chart", '{"title":"Denials","chart_type":"bar","sql":"SELECT 1"}'),
+      callDone("c1", "create_chart", '{"title":"Events","chart_type":"bar","sql":"SELECT 1"}'),
     ]);
-    strictEqual((out[0] as { detail: string }).detail, "bar · Denials");
+    strictEqual((out[0] as { detail: string }).detail, "bar · Events");
   });
 
   it("survives unparseable tool arguments", () => {

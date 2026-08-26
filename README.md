@@ -58,7 +58,7 @@ Or use the facade directly in your own code:
 import { Analytics } from "@infino-ai/analytics";
 
 const analytics = new Analytics({ infino: { uri, apiKey } });
-for await (const event of analytics.ask("which features have the most denials?")) {
+for await (const event of analytics.ask("describe this dataset")) {
   // status | delta | progress | sql | chart (spec + rows + binding) | summary | done
 }
 ```
