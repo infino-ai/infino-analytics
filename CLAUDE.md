@@ -21,7 +21,8 @@ and `ANTHROPIC_API_KEY`. Optional: `FINO_MODEL`, `FINO_DB` (SQLite path),
 (operator notes about the dataset, appended to the agent's system prompt),
 `FINO_MAX_TURNS` (per-question turn ceiling), `PORT`. `FINO_HARNESS` picks the
 harness and is required — `claude` or `openai`, no default. `openai` needs `OPENAI_BASE_URL`,
-`OPENAI_API_KEY`, and `OPENAI_MODEL` instead of `ANTHROPIC_API_KEY`.
+`OPENAI_API_KEY`, and `OPENAI_MODEL` instead of `ANTHROPIC_API_KEY`, and takes
+an optional `OPENAI_REASONING_EFFORT` (none/low/medium/high).
 `FINO_DOMAIN_CONTEXT` and `FINO_MAX_TURNS` reach either harness. The cost
 ceiling does not: `FINO_MAX_BUDGET_USD` is Claude's (it bills dollars) and
 `FINO_MAX_TOTAL_TOKENS` is OpenAI's (it bills tokens).

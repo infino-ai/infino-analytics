@@ -27,7 +27,7 @@ export interface LoopOptions {
   previousResponseId?: string;
   maxTurns: number;
   maxTotalTokens: number;
-  reasoningEffort?: "low" | "medium" | "high";
+  reasoningEffort?: "none" | "low" | "medium" | "high";
   tools: ToolRegistry;
   stream: StreamFn;
   /** Side channel: tools push UI-bound events (sql, chart with full rows)
