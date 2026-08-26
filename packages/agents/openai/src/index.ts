@@ -48,7 +48,9 @@ export interface OpenAIConfig {
   maxTurns?: number;
   /** Cumulative billed tokens per question (default 400k). */
   maxTotalTokens?: number;
-  reasoningEffort?: "low" | "medium" | "high";
+  /** Reasoning tier, the four every model accepts; unset lets the provider
+   * choose. */
+  reasoningEffort?: "none" | "low" | "medium" | "high";
   requestTimeoutMs?: number;
 }
 

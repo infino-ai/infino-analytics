@@ -89,13 +89,22 @@ const HARNESSES: Record<string, () => Promise<AgentHarness>> = {
       maxBudgetUsd: numberEnv("FINO_MAX_BUDGET_USD"),
       domainContext: DOMAIN_CONTEXT,
     }),
-  openai: async () =>
-    (await import("@infino-ai/analytics-agent-openai")).createOpenAIHarness({
+  openai: async () => {
+    // Checked inside this entry so an OPENAI_* typo cannot fail a claude boot.
+    const EFFORTS = ["none", "low", "medium", "high"] as const;
+    const effort = process.env.OPENAI_REASONING_EFFORT;
+    if (effort && !(EFFORTS as readonly string[]).includes(effort)) {
+      console.error(`OPENAI_REASONING_EFFORT must be one of: ${EFFORTS.join(", ")} (got ${effort})`);
+      process.exit(1);
+    }
+    return (await import("@infino-ai/analytics-agent-openai")).createOpenAIHarness({
       infino: { uri: INFINO_URI },
       maxTurns: MAX_TURNS,
       maxTotalTokens: numberEnv("FINO_MAX_TOTAL_TOKENS"),
       domainContext: DOMAIN_CONTEXT,
-    }),
+      reasoningEffort: effort as (typeof EFFORTS)[number] | undefined,
+    });
+  },
 };
 
 // Mandatory, with no fallback: a default would make one provider the implicit

@@ -78,7 +78,7 @@ describe("buildToolRegistry", () => {
     const emitted: ChatEvent[] = [];
     const result = await registry((e) => emitted.push(e)).invoke(
       "create_chart",
-      JSON.stringify({ title: "Denials", chart_type: "bar", table: "t", sql: "SELECT day, n FROM t", x: "day", y: ["n"] }),
+      JSON.stringify({ title: "Events", chart_type: "bar", table: "t", sql: "SELECT day, n FROM t", x: "day", y: ["n"] }),
     );
     deepStrictEqual(emitted.map((e) => e.type), ["sql", "chart"]);
     strictEqual(result.isError, false);
