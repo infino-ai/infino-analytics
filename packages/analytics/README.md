@@ -29,7 +29,7 @@ Consumers only ever need this package; the types below are re-exported from it.
 |---|---|
 | An Infino database | Infino Cloud (`https://api.platform.infino.ws/<database>`) with your data already ingested (see `ingestion/` at the repo root for example loaders) |
 | Infino API key | `config.infino.apiKey`, or the `INFINO_API_KEY` environment variable |
-| An LLM credential | Whatever the harness you construct needs — `ANTHROPIC_API_KEY` for `createClaudeHarness`, `OPENAI_API_KEY` for `createOpenAIHarness`. Needed only for `ask()`; the visualization API never touches an LLM |
+| An LLM credential | Whatever the harness you construct needs — `ANTHROPIC_API_KEY` for `createClaudeHarness`, `OPENAI_API_KEY` for `createOpenAIHarness`, and for `createOpencodeHarness` the environment variables of the provider its model names (for Google Vertex AI: `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`). Needed only for `ask()`; the visualization API never touches an LLM |
 
 ## Configuration
 
@@ -96,26 +96,26 @@ nothing more. Writing your own: implement that, reuse `buildSystemPrompt`,
 and assert it with `assertHarnessConformance` from
 `@infino-ai/analytics-core/conformance`.
 
-### Choosing between the bundled two
+### Choosing between the bundled three
 
-Both satisfy the same contract, so the UI and the persistence API cannot tell
-them apart. They are not equivalent in what they give you.
+All three satisfy the same contract, so the UI and the persistence API cannot
+tell them apart. They are not equivalent in what they give you.
 
-| | `claude` | `openai` |
-|---|---|---|
-| Provider | Anthropic, via the Claude Agent SDK | Any OpenAI Responses endpoint — `api.openai.com`, Azure OpenAI / AI Foundry |
-| Spend ceiling | `maxBudgetUsd`, enforced in real dollars | `maxTotalTokens`, a proxy checked **between turns** — a single runaway turn is unbounded |
-| `done.costUsd` | reported | omitted; the API bills tokens, not dollars |
-| `summary` event | emitted | never — the Responses API has no second copy of the final text |
-| Web search | yes (`WebSearch`/`WebFetch`) | no; the system prompt drops that promise |
-| Long threads | SDK compacts context automatically | **no compaction** — server-side history grows until the model's limit, then the turn fails |
-| Large tool results | SDK truncates before they reach the model | **unbounded** — a wide `infino_sql` can exhaust context (`create_chart` is safe: the model gets a 5-row receipt) |
-| Built-in tools | ships Bash/file I/O, so a deny list is mandatory | none; the model sees exactly the tools you pass |
+| | `claude` | `openai` | `opencode` |
+|---|---|---|---|
+| Provider | Anthropic, via the Claude Agent SDK | Any OpenAI Responses endpoint — `api.openai.com`, Azure OpenAI / AI Foundry | Any provider opencode supports, named as `<provider>/<model>`; the harness runs a pinned opencode server as a child process |
+| Spend ceiling | `maxBudgetUsd`, enforced in real dollars | `maxTotalTokens`, a proxy checked **between turns** — a single runaway turn is unbounded | `maxBudgetUsd`, in dollars as opencode prices them, checked as each model call reports, so a single call is unbounded |
+| `done.costUsd` | reported | omitted; the API bills tokens, not dollars | reported |
+| `summary` event | emitted | never — the Responses API has no second copy of the final text | never; the final text arrives once |
+| Web search | yes (`WebSearch`/`WebFetch`) | no; the system prompt drops that promise | no; the system prompt drops that promise |
+| Long threads | SDK compacts context automatically | **no compaction** — server-side history grows until the model's limit, then the turn fails | opencode has its own compaction (it emits `session.compacted`), not yet exercised by this kit; resume needs its data directory (`dataDir`) to survive |
+| Large tool results | SDK truncates before they reach the model | **unbounded** — a wide `infino_sql` can exhaust context (`create_chart` is safe: the model gets a 5-row receipt) | opencode has its own output truncation (each tool result carries a `truncated` flag), not yet exercised by this kit |
+| Built-in tools | ships Bash/file I/O, so a deny list is mandatory | none; the model sees exactly the tools you pass | ships Bash/file I/O; all disabled, and boot fails if opencode reports one the harness does not know |
 
 Read the last three rows together. The Claude harness is more robust on long
 or data-heavy conversations because the SDK is doing work we have not
-reimplemented. The OpenAI harness is safer by construction, because there is
-no ambient tool surface to lock down. Pick accordingly, and treat the two
+reimplemented; opencode claims the same machinery, unverified here. The OpenAI harness is safer by construction, because
+there is no ambient tool surface to lock down. Pick accordingly, and treat the
 "unbounded" rows as known limitations rather than settled design.
 
 ## Methods

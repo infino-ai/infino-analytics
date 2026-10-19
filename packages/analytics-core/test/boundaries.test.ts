@@ -12,12 +12,16 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 const CLAUDE = /claude|anthropic|\bopus\b|\bsonnet\b|\bhaiku\b|bedrock|agent sdk/i;
 const OPENAI = /openai|\bgpt\b|gpt-|azure|foundry|responses api/i;
-const ANY_PROVIDER = new RegExp(`${CLAUDE.source}|${OPENAI.source}`, "i");
+const OPENCODE = /opencode/i;
+const ANY_PROVIDER = new RegExp(`${CLAUDE.source}|${OPENAI.source}|${OPENCODE.source}`, "i");
+const peersOf = (...own: RegExp[]) =>
+  new RegExp([CLAUDE, OPENAI, OPENCODE].filter((r) => !own.includes(r)).map((r) => r.source).join("|"), "i");
 
 /** A harness may name its own provider; nothing else may name any. */
 const RULES = [
-  { dir: "packages/agents/openai", forbid: CLAUDE, what: "a peer harness's provider" },
-  { dir: "packages/agents/claude", forbid: OPENAI, what: "a peer harness's provider" },
+  { dir: "packages/agents/openai", forbid: peersOf(OPENAI), what: "a peer harness's provider" },
+  { dir: "packages/agents/claude", forbid: peersOf(CLAUDE), what: "a peer harness's provider" },
+  { dir: "packages/agents/opencode", forbid: peersOf(OPENCODE), what: "a peer harness's provider" },
   { dir: "packages/analytics-core/src", forbid: ANY_PROVIDER, what: "any provider" },
   { dir: "packages/analytics/src", forbid: ANY_PROVIDER, what: "any provider" },
   { dir: "packages/storage-sqlite/src", forbid: ANY_PROVIDER, what: "any provider" },
@@ -25,7 +29,9 @@ const RULES = [
 ];
 
 // The MCP SDK is transport, not a provider, and every harness speaks it.
-const EXEMPT = /@modelcontextprotocol/;
+// OPENCODE_DISABLE_CLAUDE_CODE is opencode's own switch for its instruction-
+// file compatibility; the name is opencode's, not a reference to a peer.
+const EXEMPT = /@modelcontextprotocol|OPENCODE_DISABLE_CLAUDE_CODE\b/;
 
 /** Empty when the directory is absent — a fork deleting the harness it did not
  * pick is a supported state, not a failing rule. */

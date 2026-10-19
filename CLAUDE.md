@@ -20,19 +20,23 @@ and `ANTHROPIC_API_KEY`. Optional: `FINO_MODEL`, `FINO_DB` (SQLite path),
 `FINO_SUGGESTIONS` (pipe-separated question chips), `FINO_DOMAIN_CONTEXT`
 (operator notes about the dataset, appended to the agent's system prompt),
 `FINO_MAX_TURNS` (per-question turn ceiling), `PORT`. `FINO_HARNESS` picks the
-harness and is required — `claude` or `openai`, no default. `openai` needs `OPENAI_BASE_URL`,
+harness and is required — `claude`, `openai` or `opencode`, no default. `openai` needs `OPENAI_BASE_URL`,
 `OPENAI_API_KEY`, and `OPENAI_MODEL` instead of `ANTHROPIC_API_KEY`, and takes
-an optional `OPENAI_REASONING_EFFORT` (none/low/medium/high).
-`FINO_DOMAIN_CONTEXT` and `FINO_MAX_TURNS` reach either harness. The cost
-ceiling does not: `FINO_MAX_BUDGET_USD` is Claude's (it bills dollars) and
-`FINO_MAX_TOTAL_TOKENS` is OpenAI's (it bills tokens).
+an optional `OPENAI_REASONING_EFFORT` (none/low/medium/high). `opencode` needs
+`OPENCODE_MODEL` (`<provider>/<model>`) plus whatever credentials that
+provider reads from the environment, and takes optional `OPENCODE_DATA_DIR`
+and `OPENCODE_MCP_TIMEOUT_MS` (per tool call, default 120 s).
+`FINO_DOMAIN_CONTEXT` and `FINO_MAX_TURNS` reach every harness. The cost
+ceiling does not: `FINO_MAX_BUDGET_USD` is Claude's and opencode's (they
+report dollars) and `FINO_MAX_TOTAL_TOKENS` is OpenAI's (it bills tokens).
 
 `npm test` covers the pure logic (filters, execute/binding, mergePatch,
-toEChartsOption, the ask() seam, the OpenAI stream mapper and turn loop) plus
+toEChartsOption, the ask() seam, the OpenAI stream mapper and turn loop, the
+opencode event mapper and chart server) plus
 a conformance suite every harness must pass — no network, no credentials.
 Anything touching a live provider is verified by
-`npm run smoke -w @infino-ai/analytics-agent-openai` and by exercising the
-running server.
+`npm run smoke -w @infino-ai/analytics-agent-openai` (or `-opencode`) and by
+exercising the running server.
 
 ## Layout
 
@@ -44,6 +48,8 @@ packages/agents/claude      Claude Agent SDK event loop + the tool policy.
                             A peer, not a default.
 packages/agents/openai      OpenAI Responses API harness + its MCP client. Any
                             compatible deployment; selected by FINO_HARNESS.
+packages/agents/opencode    opencode server harness: spawns the pinned binary,
+                            serves create_chart to it as a local HTTP MCP.
 packages/storage-sqlite     reference StorageAdapter (one SQLite file)
 packages/analytics          the facade consumers install: Analytics class,
                             toEChartsOption. Depends on all of the above.
@@ -58,8 +64,9 @@ harness packages depend only on `analytics-core`. Never invert these.
 `analytics` depends on NO harness package and has no default: `apps/server`
 is the only place a provider is named, behind a dynamic import per entry in
 `HARNESSES`. That is what lets a deployment carry one provider instead of
-both — an OpenAI-only fork deletes `packages/agents/claude`, its `apps/server`
-dependency, and its `HARNESSES` entry, and nothing else changes.
+all of them — an OpenAI-only fork deletes the other `packages/agents/*`, their
+`apps/server` dependencies, and their `HARNESSES` entries, and nothing else
+changes.
 
 ## Load-bearing contracts
 
@@ -96,7 +103,7 @@ Break any of these and consumers break with you.
 - **Storage is a seam.** Consumers type against `StorageAdapter` only; a
   new database is a new adapter package, not edits to consumers.
 - **Harnesses are peers under `packages/agents/`**, mirroring `storage-*`:
-  `<seam>-<implementation>`. Neither is privileged and neither is a default —
+  `<seam>-<implementation>`. None is privileged and none is a default —
   `apps/server` requires `FINO_HARNESS` to name one from `HARNESSES`, and
   booting without it is an error, because a fallback would quietly make one
   provider the answer. Each entry owns its own env block, so a knob only
@@ -111,6 +118,21 @@ Break any of these and consumers break with you.
   `maxTotalTokens`), no `summary` event (the Responses API has no second copy
   of the final text), and no web search. It also owns the MCP child process
   the Claude SDK used to own, so every exit path must close it.
+- **The opencode harness diverges too** (`agents/opencode/src/index.ts`): no
+  `summary` event and no web search. opencode runs tools in its own process,
+  so `create_chart` cannot push into the run's queue: `agents/opencode/src/charts.ts`
+  serves it as a remote MCP on a secret localhost path, parks the UI events in a
+  ledger keyed by the receipt, and the run claims them when opencode hands that
+  receipt back as the tool output. No opaque id goes in the receipt: opencode
+  drops MCP `_meta`, and a model echoes ids it sees into its answer. Every
+  opencode built-in tool is disabled, and boot fails if opencode reports one
+  the list does not know, so an upgrade cannot hand the agent a new host tool.
+  Permissions are all `deny`, `doom_loop` included: nobody is there to answer a
+  prompt, so opencode refuses the call and the model reads the refusal. A run
+  that still asks is aborted. A run silent past the tool timeout plus three
+  minutes is aborted as stuck, and one whose consumer walks away is aborted so
+  it stops spending. The binary and SDK are pinned to the same exact version;
+  bump them together.
 - **Tool policy** (`agents/claude/src/index.ts`): under `dontAsk`, `allowedTools`
   only auto-approves; `disallowedTools` is what actually blocks. Host-
   reaching tools (Bash, file I/O) stay denied because the server process
@@ -135,6 +157,11 @@ Real, not theoretical. Do not paper over them with a comment; fix or flag.
   the truncation must be visible to the model, not silent.
 - **`maxTotalTokens` is checked between turns only**, so it bounds a runaway
   loop but not a single runaway turn. It is a cost proxy, not `maxBudgetUsd`.
+  The opencode budget has the same shape: it is checked as each model call
+  reports its cost.
+- **opencode sessions live in `OPENCODE_DATA_DIR`.** A thread resumes only
+  while that directory survives; in a container it needs a volume. A lost
+  session restarts the conversation rather than failing.
 - **No eval set.** The conformance suite proves a harness honours the
   contract; nothing measures whether it answers *well*. Prompt or model
   changes are currently unfalsifiable — say so rather than claiming parity.
@@ -160,8 +187,8 @@ Additive by construction: a new package plus one line of wiring. Nothing in
 6. One entry in `HARNESSES` in `apps/server/src/index.ts`, plus `.env.example`.
 
 Deliberately NOT abstracted, so nobody "fixes" it: the MCP client and the turn
-loop live in `agents/openai` alone. The Claude SDK owns its own loop and spawns
-MCP from config, so both are single-copy — extracting a one-consumer
+loop live in `agents/openai` alone. The Claude SDK and opencode own their own
+loops and spawn MCP from config, so each is single-copy — extracting a one-consumer
 abstraction would be the smell, not the cure.
 
 ## Conventions

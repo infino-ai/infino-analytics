@@ -71,15 +71,16 @@ const storage = new SqliteStorage({ path: process.env.FINO_DB ?? "./data/analyti
 const INFINO_URI = requireEnv("INFINO_URI");
 
 // Shared by whichever harness runs: dataset notes and the turn ceiling mean
-// the same thing to both. The cost ceilings do not, so they live per entry.
+// the same thing to all of them. The cost ceilings do not, so they live per
+// entry.
 const DOMAIN_CONTEXT = process.env.FINO_DOMAIN_CONTEXT;
 const MAX_TURNS = numberEnv("FINO_MAX_TURNS");
 
-// Peers, and the only place either provider is named. Each entry owns its
-// own env block, so a knob reaches exactly the harness that understands it —
-// dollars for Claude, tokens for OpenAI. Both imports are dynamic, so the
-// unselected provider is never loaded, and a fork that deletes one package
-// deletes its entry here and carries no trace of it.
+// Peers, and the only place any provider is named. Each entry owns its own
+// env block, so a knob reaches exactly the harness that understands it:
+// dollars for Claude and opencode, tokens for OpenAI. Every import is
+// dynamic, so an unselected provider is never loaded, and a fork that deletes
+// one package deletes its entry here and carries no trace of it.
 const HARNESSES: Record<string, () => Promise<AgentHarness>> = {
   claude: async () =>
     (await import("@infino-ai/analytics-agent-claude")).createClaudeHarness({
@@ -105,6 +106,16 @@ const HARNESSES: Record<string, () => Promise<AgentHarness>> = {
       reasoningEffort: effort as (typeof EFFORTS)[number] | undefined,
     });
   },
+  opencode: async () =>
+    (await import("@infino-ai/analytics-agent-opencode")).createOpencodeHarness({
+      infino: { uri: INFINO_URI },
+      model: process.env.OPENCODE_MODEL,
+      maxTurns: MAX_TURNS,
+      maxBudgetUsd: numberEnv("FINO_MAX_BUDGET_USD"),
+      domainContext: DOMAIN_CONTEXT,
+      dataDir: process.env.OPENCODE_DATA_DIR,
+      mcpTimeoutMs: numberEnv("OPENCODE_MCP_TIMEOUT_MS"),
+    }),
 };
 
 // Mandatory, with no fallback: a default would make one provider the implicit

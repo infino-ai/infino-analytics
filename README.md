@@ -47,7 +47,8 @@ INFINO_URI=https://api.platform.infino.ws/<database> \
 INFINO_API_KEY=... FINO_HARNESS=claude ANTHROPIC_API_KEY=... npm run dev
 # → http://localhost:8787
 # FINO_HARNESS is required and has no default: "claude" needs
-# ANTHROPIC_API_KEY, "openai" needs the OPENAI_* block in .env.example.
+# ANTHROPIC_API_KEY, "openai" needs the OPENAI_* block in .env.example,
+# "opencode" needs OPENCODE_MODEL plus that provider's credentials.
 # Optional: FINO_SUGGESTIONS="q1|q2|q3" sets the suggested-question chips
 # for your dataset; without it, generic suggestions are shown.
 ```
@@ -72,6 +73,8 @@ packages/analytics-core   the contract layer: VizSpec, ChatEvent, StorageAdapter
 packages/agents/claude    the Claude Agent SDK harness + tool policy
 packages/agents/openai    the OpenAI Responses API over MCP; any compatible
                           deployment (api.openai.com, Azure OpenAI / Foundry)
+packages/agents/opencode  an opencode server the harness runs itself; any
+                          provider opencode supports (e.g. Google Vertex AI)
 packages/storage-sqlite   the reference StorageAdapter: app state in one SQLite file
 packages/analytics        the facade: new Analytics({...}) — ask() + threads (Fino),
                           visualizations + dashboards (persistence API) on one client
@@ -107,9 +110,9 @@ The intended path, in the order most forks take it:
    with `FINO_HARNESS=openai`. A new harness must pass
    `assertHarnessConformance` — the contract's executable spec.
 5. **Then delete the harness you did not pick.** A fork answers with one
-   LLM, so carrying both means carrying a provider SDK you never call. Set
-   `FINO_HARNESS`, then remove the other `packages/agents/*` package, its
-   `apps/server` dependency, and its entry in `HARNESSES`. Dropping
+   LLM, so carrying the others means carrying provider SDKs you never call. Set
+   `FINO_HARNESS`, then remove the other `packages/agents/*` packages, their
+   `apps/server` dependencies, and their entries in `HARNESSES`. Dropping
    `agents/openai` also drops the `openai` package that sets this repo's
    Node 22.18 floor.
 6. **Put your gateway in front.** The reference server ships without

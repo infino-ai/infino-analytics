@@ -11,6 +11,7 @@
     "@infino-ai/analytics": "*",
     "@infino-ai/analytics-agent-claude": "*",
     "@infino-ai/analytics-agent-openai": "*",
+    "@infino-ai/analytics-agent-opencode": "*",
     "@infino-ai/analytics-storage-sqlite": "*",
     "hono": "^4.6.0"
   }
