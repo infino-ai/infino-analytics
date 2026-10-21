@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { MCP_READONLY_PROXY } from "@infino-ai/analytics-core";
 import type { FunctionTool } from "openai/resources/responses/responses";
 
 // The data tools, from the published @infino-ai/mcp-server over stdio. This
@@ -26,7 +27,9 @@ export async function connectInfinoMcp(opts: McpOptions): Promise<McpToolset> {
   const entry = opts.entry ?? createRequire(import.meta.url).resolve("@infino-ai/mcp-server");
   const transport = new StdioClientTransport({
     command: process.execPath,
-    args: [entry],
+    // Through the read-only filter: the server's write tools never reach the
+    // model.
+    args: [MCP_READONLY_PROXY, entry],
     // HOME is merged in by the SDK's default env and matters: the server's
     // local embedder caches its model there.
     env: { INFINO_MCP_URI: opts.databaseUri, INFINO_API_KEY: opts.apiKey },

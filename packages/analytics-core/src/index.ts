@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 export {
   VizSpecSchema,
   SqlSourceSchema,
@@ -60,3 +61,8 @@ export type {
 export { injectFilters, mergeFilters, timeRangeFilter } from "./filters.js";
 export type { InjectionResult } from "./filters.js";
 export type { ExecuteOptions } from "./execute.js";
+
+/** Path to the read-only filter every harness starts the Infino MCP server
+ * through: `node <MCP_READONLY_PROXY> <server entry>`. Only read tools reach
+ * the agent; see mcp-readonly.mjs. */
+export const MCP_READONLY_PROXY = fileURLToPath(new URL("./mcp-readonly.mjs", import.meta.url));

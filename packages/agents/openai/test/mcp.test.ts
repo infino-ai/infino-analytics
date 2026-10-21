@@ -19,11 +19,11 @@ const alive = (pid: number | null) => {
 };
 
 describe("connectInfinoMcp", () => {
-  it("lists the server's tools as Responses function tools", async () => {
+  it("lists only the server's read tools, as Responses function tools", async () => {
     const mcp = await connect();
     try {
       strictEqual(mcp.tools.length, 1);
-      strictEqual(mcp.tools[0].name, "echo");
+      strictEqual(mcp.tools[0].name, "infino_sql");
       strictEqual(mcp.tools[0].type, "function");
     } finally {
       await mcp.close();
@@ -33,9 +33,20 @@ describe("connectInfinoMcp", () => {
   it("calls a tool and flattens its text content", async () => {
     const mcp = await connect();
     try {
-      const result = await mcp.call("echo", { message: "hi" });
-      strictEqual(result.text, "hi");
+      const result = await mcp.call("infino_sql", { query: "SELECT 1" });
+      strictEqual(result.text, "SELECT 1");
       strictEqual(result.isError, false);
+    } finally {
+      await mcp.close();
+    }
+  });
+
+  it("refuses a write tool even when called by name", async () => {
+    const mcp = await connect();
+    try {
+      const result = await mcp.call("infino_drop_table", { table: "t" });
+      strictEqual(result.isError, true);
+      strictEqual(result.text, "infino_drop_table is not available: this agent is read-only");
     } finally {
       await mcp.close();
     }
