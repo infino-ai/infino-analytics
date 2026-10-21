@@ -77,7 +77,7 @@ definition first and match conversations against it.`
 > **Breaking change:** the `llm` and `domainContext` config fields are gone.
 > They configured a built-in Claude default that no longer exists — pass a
 > `harness` you built yourself, with that config on it. This is what lets a
-> deployment carry one provider instead of both.
+> deployment carry one provider instead of all of them.
 
 ## Swapping the harness
 
@@ -104,6 +104,7 @@ tell them apart. They are not equivalent in what they give you.
 | | `claude` | `openai` | `opencode` |
 |---|---|---|---|
 | Provider | Anthropic, via the Claude Agent SDK | Any OpenAI Responses endpoint — `api.openai.com`, Azure OpenAI / AI Foundry | Any provider opencode supports, named as `<provider>/<model>`; the harness runs a pinned opencode server as a child process |
+| Turn ceiling | stops with an error (`error_max_turns`) | stops with an error (`max_turns`) | no error: opencode switches the tools off and has the model write a final answer from what it has |
 | Spend ceiling | `maxBudgetUsd`, enforced in real dollars | `maxTotalTokens`, a proxy checked **between turns** — a single runaway turn is unbounded | `maxBudgetUsd`, in dollars as opencode prices them, checked as each model call reports, so a single call is unbounded |
 | `done.costUsd` | reported | omitted; the API bills tokens, not dollars | reported |
 | `summary` event | emitted | never — the Responses API has no second copy of the final text | never; the final text arrives once |

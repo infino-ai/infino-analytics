@@ -6,9 +6,11 @@ import { stepDetail, stepResult, type ChatEvent } from "@infino-ai/analytics-cor
 // calls, which is what makes this mapping testable without a server.
 
 export interface RunOutcome {
-  /** The session went idle: the run is over, whatever its result. */
-  idle: boolean;
-  /** Set when opencode reported a failure that was not a cancellation. */
+  /** The run is over: the session went idle after this run's question, or
+   * failed before ever taking it. */
+  ended: boolean;
+  /** Set when the run failed, including a cancellation this run did not ask
+   * for. */
   failure?: string;
   /** opencode stopped to ask for a permission or an answer. Nobody is there
    * to give one, so the harness aborts instead of waiting forever. */
@@ -24,27 +26,32 @@ export interface EventMapper {
 
 export interface MapperOptions {
   sessionId: string;
+  /** The id this run sent its question under. */
+  questionId: string;
   /** MCP server names as configured; opencode prefixes tool ids with them. */
   mcpServers: readonly string[];
   /** Returns the UI events a create_chart call parked, given its output. */
   claimChart(output: string | undefined): ChatEvent[];
+  /** Whether this run asked opencode to cancel, so an abort it did not ask
+   * for reads as a failure rather than a quiet, empty answer. */
+  abortedByRun(): boolean;
 }
 
 export function createEventMapper(opts: MapperOptions): EventMapper {
-  const partTypes = new Map<string, string>();
-  // Only an assistant reply to this run's question is part of this run: the
-  // question arrives as a text part too, and a previous run on the session
-  // can still be emitting late updates for its own replies.
+  // The run's own messages. Its question, plus any user message opencode adds
+  // after it (compaction's continue prompt); a previous run on the session
+  // can still be emitting late updates for messages from before it.
+  let asked = false;
   const questions = new Set<string>();
-  const assistantMessages = new Set<string>();
-  // An idle from before this run's prompt (a previous run winding down after
-  // an abort) must not end this one, so idle counts only once it went busy.
+  const answers = new Set<string>();
+  const costByMessage = new Map<string, number>();
   let busy = false;
+
+  const partTypes = new Map<string, string>();
   const progressed = new Set<string>();
   const opened = new Set<string>();
   const closed = new Set<string>();
-  const costByMessage = new Map<string, number>();
-  const outcome: RunOutcome = { idle: false, costUsd: 0, turns: 0 };
+  const outcome: RunOutcome = { ended: false, costUsd: 0, turns: 0 };
 
   const toolName = (id: string) => {
     const server = opts.mcpServers.find((s) => id.startsWith(`${s}_`));
@@ -56,8 +63,25 @@ export function createEventMapper(opts: MapperOptions): EventMapper {
       if (sessionOf(event) !== opts.sessionId) return [];
 
       switch (event.type) {
+        case "message.updated": {
+          const info = event.properties.info;
+          if (info.role === "user") {
+            if (info.id === opts.questionId) asked = true;
+            if (asked) questions.add(info.id);
+          } else if (questions.has(info.parentID)) {
+            costByMessage.set(info.id, info.cost ?? 0);
+            outcome.turns = costByMessage.size;
+            outcome.costUsd = [...costByMessage.values()].reduce((a, b) => a + b, 0);
+            // A compaction summary is opencode's note to itself: it costs
+            // money but is no part of the answer.
+            if (!info.summary) answers.add(info.id);
+          }
+          return [];
+        }
+
         case "message.part.updated": {
           const part = event.properties.part;
+          if (!answers.has(part.messageID)) return [];
           const seen = partTypes.has(part.id);
           partTypes.set(part.id, part.type);
 
@@ -66,7 +90,7 @@ export function createEventMapper(opts: MapperOptions): EventMapper {
           if (part.type === "text") {
             // A text part is re-sent as it grows; it is final once it has an
             // end time, and only then becomes a durable progress event.
-            if (!assistantMessages.has(part.messageID) || !part.time?.end || progressed.has(part.id) || part.synthetic || !part.text.trim()) return [];
+            if (!part.time?.end || progressed.has(part.id) || part.synthetic || !part.text.trim()) return [];
             progressed.add(part.id);
             return [{ type: "progress", text: part.text }];
           }
@@ -90,28 +114,25 @@ export function createEventMapper(opts: MapperOptions): EventMapper {
         }
 
         case "message.part.delta": {
-          const { partID, field, delta } = event.properties;
-          const isAnswer = field === "text" && partTypes.get(partID) === "text" && assistantMessages.has(event.properties.messageID);
+          const { messageID, partID, field, delta } = event.properties;
+          const isAnswer = field === "text" && answers.has(messageID) && partTypes.get(partID) === "text";
           return isAnswer && delta ? [{ type: "delta", text: delta }] : [];
-        }
-
-        case "message.updated": {
-          const info = event.properties.info;
-          if (info.role === "user") questions.add(info.id);
-          if (info.role === "assistant" && questions.has(info.parentID)) {
-            assistantMessages.add(info.id);
-            costByMessage.set(info.id, info.cost ?? 0);
-            outcome.turns = costByMessage.size;
-            outcome.costUsd = [...costByMessage.values()].reduce((a, b) => a + b, 0);
-          }
-          return [];
         }
 
         case "session.error": {
           const error = event.properties.error;
-          if (!error || error.name === "MessageAbortedError") return [];
+          if (!error) return [];
+          // opencode compacts the conversation and carries on.
+          if (error.name === "ContextOverflowError") return [];
+          if (error.name === "MessageAbortedError") {
+            if (asked && !opts.abortedByRun()) outcome.failure ??= "agent stopped: the answer was cancelled";
+            return [];
+          }
           const message = "data" in error && error.data && typeof error.data.message === "string" ? error.data.message : "";
-          outcome.failure = `agent stopped: ${error.name}${message ? ` — ${message.slice(0, 300)}` : ""}`;
+          outcome.failure ??= `agent stopped: ${error.name}${message ? ` — ${message.slice(0, 300)}` : ""}`;
+          // Failing before it ever went busy (the provider rejected the
+          // request outright), opencode sends no busy or idle to wait for.
+          if (!busy) outcome.ended = true;
           return [];
         }
 
@@ -124,13 +145,15 @@ export function createEventMapper(opts: MapperOptions): EventMapper {
 
         case "session.status": {
           const status = event.properties.status;
-          if (status.type === "busy") busy = true;
+          busy = status.type !== "idle";
           // A provider retry can take a while; say so instead of going quiet.
           return status.type === "retry" ? [{ type: "status", text: `retrying: ${status.message}` }] : [];
         }
 
         case "session.idle":
-          if (busy) outcome.idle = true;
+          // An idle before this run's question is a previous run's.
+          busy = false;
+          if (asked) outcome.ended = true;
           return [];
 
         default:

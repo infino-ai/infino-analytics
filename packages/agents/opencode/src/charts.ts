@@ -20,47 +20,90 @@ import {
 // context. Nothing opaque goes into the receipt, because opencode forwards no
 // MCP side channel and a model repeats whatever ids it is shown.
 
-/** Unclaimed entries (an aborted run) are dropped after this long. */
+/** Unclaimed entries (an aborted run, a timed-out call) are dropped after
+ * this long. */
 const LEDGER_TTL_MS = 10 * 60_000;
-/** How much of a receipt must survive if opencode truncates the output. */
-const TRUNCATED_MATCH_CHARS = 2000;
 const MAX_BODY_BYTES = 1_000_000;
+// opencode replaces any tool output over 51,200 bytes with a truncation note,
+// and a receipt it replaced could never be matched to its chart. The cap
+// leaves room under that limit.
+const RECEIPT_MAX_BYTES = 40_000;
+const CELL_MAX_CHARS = 200;
 
 export class ChartLedger {
   // A queue per receipt: identical receipts (same title, type, SQL and
   // result) carry identical events, so which one a run claims does not matter.
   private readonly entries = new Map<string, { events: ChatEvent[]; at: number }[]>();
+  private readonly sweeper: ReturnType<typeof setInterval>;
+
+  constructor(
+    private readonly ttlMs = LEDGER_TTL_MS,
+    private readonly now: () => number = Date.now,
+  ) {
+    // Expiry also runs on a timer, so a quiet server does not hold an
+    // abandoned chart's rows until the next chart comes along.
+    this.sweeper = setInterval(() => this.sweep(), ttlMs);
+    this.sweeper.unref();
+  }
 
   park(receipt: string, events: ChatEvent[]): void {
-    const now = Date.now();
-    for (const [key, queue] of this.entries) {
-      const live = queue.filter((e) => now - e.at <= LEDGER_TTL_MS);
-      if (live.length) this.entries.set(key, live);
-      else this.entries.delete(key);
-    }
-    this.entries.set(receipt, [...(this.entries.get(receipt) ?? []), { events, at: now }]);
+    this.sweep();
+    if (events.length === 0) return;
+    this.entries.set(receipt, [...(this.entries.get(receipt) ?? []), { events, at: this.now() }]);
   }
 
   /** The events parked under a create_chart output; empty when nothing
-   * matches or they were already claimed. An exact match wins; failing that,
-   * a long shared prefix stands in for an output opencode truncated. */
+   * matches, they expired, or they were already claimed. */
   claim(toolOutput: string | undefined): ChatEvent[] {
+    this.sweep();
     if (!toolOutput) return [];
-    const key = this.entries.has(toolOutput) ? toolOutput : this.truncatedMatch(toolOutput);
-    if (key === undefined) return [];
-    const queue = this.entries.get(key) ?? [];
-    const entry = queue.shift();
-    if (queue.length === 0) this.entries.delete(key);
+    const queue = this.entries.get(toolOutput);
+    const entry = queue?.shift();
+    if (queue?.length === 0) this.entries.delete(toolOutput);
     return entry?.events ?? [];
   }
 
-  private truncatedMatch(output: string): string | undefined {
-    if (output.length < TRUNCATED_MATCH_CHARS) return undefined;
-    const prefix = output.slice(0, TRUNCATED_MATCH_CHARS);
-    const candidates = [...this.entries.keys()].filter((k) => k.length > output.length && k.startsWith(prefix));
-    // Ambiguity means guessing which chart a run drew; draw none instead.
-    return candidates.length === 1 ? candidates[0] : undefined;
+  close(): void {
+    clearInterval(this.sweeper);
+    this.entries.clear();
   }
+
+  private sweep(): void {
+    const cutoff = this.now() - this.ttlMs;
+    for (const [key, queue] of this.entries) {
+      const live = queue.filter((e) => e.at > cutoff);
+      if (live.length) this.entries.set(key, live);
+      else this.entries.delete(key);
+    }
+  }
+}
+
+/** Shrinks a receipt to fit RECEIPT_MAX_BYTES: long cell values are cut
+ * first, then sample rows dropped from the end. Either cut is stated in the
+ * receipt, so the model never mistakes a trimmed sample for the data. */
+export function fitReceipt(receipt: Record<string, unknown>): string {
+  const fits = (r: Record<string, unknown>) => Buffer.byteLength(JSON.stringify(r)) <= RECEIPT_MAX_BYTES;
+  if (fits(receipt)) return JSON.stringify(receipt);
+
+  const rows = Array.isArray(receipt.sample_rows) ? (receipt.sample_rows as Record<string, unknown>[]) : [];
+  const shortened = rows.map((row) =>
+    Object.fromEntries(
+      Object.entries(row).map(([k, v]) => {
+        const text = typeof v === "string" ? v : JSON.stringify(v) ?? "";
+        return [k, text.length > CELL_MAX_CHARS ? `${text.slice(0, CELL_MAX_CHARS)}…` : v];
+      }),
+    ),
+  );
+  const trimmed: Record<string, unknown> = {
+    ...receipt,
+    sample_rows: shortened,
+    sample_note: `cell values over ${CELL_MAX_CHARS} characters are cut short to keep this receipt small`,
+  };
+  while (!fits(trimmed) && (trimmed.sample_rows as unknown[]).length > 0) {
+    (trimmed.sample_rows as unknown[]).pop();
+    trimmed.sample_note = `sample cut to ${(trimmed.sample_rows as unknown[]).length} rows, with long values shortened, to keep this receipt small`;
+  }
+  return JSON.stringify(trimmed);
 }
 
 export interface ChartServer {
@@ -126,8 +169,8 @@ function buildServer(client: InfinoClient, ledger: ChartLedger): McpServer {
       // its query, among charts parked by concurrent runs.
       const chart = { title: args.title, type: args.chart_type };
       const receipt = outcome.ok
-        ? JSON.stringify({ chart, ...JSON.parse(outcome.receipt) })
-        : JSON.stringify({ chart, error: outcome.error });
+        ? fitReceipt({ chart, ...JSON.parse(outcome.receipt) })
+        : fitReceipt({ chart, error: outcome.error });
       ledger.park(receipt, events);
       return { content: [{ type: "text" as const, text: receipt }], isError: !outcome.ok };
     },

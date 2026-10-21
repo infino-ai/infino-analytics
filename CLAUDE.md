@@ -119,7 +119,9 @@ Break any of these and consumers break with you.
   of the final text), and no web search. It also owns the MCP child process
   the Claude SDK used to own, so every exit path must close it.
 - **The opencode harness diverges too** (`agents/opencode/src/index.ts`): no
-  `summary` event and no web search. opencode runs tools in its own process,
+  `summary` event and no web search, and `FINO_MAX_TURNS` does not end the run
+  with an error: at the ceiling opencode switches the tools off and the model
+  writes a final answer from what it has. opencode runs tools in its own process,
   so `create_chart` cannot push into the run's queue: `agents/opencode/src/charts.ts`
   serves it as a remote MCP on a secret localhost path, parks the UI events in a
   ledger keyed by the receipt, and the run claims them when opencode hands that
@@ -131,8 +133,14 @@ Break any of these and consumers break with you.
   prompt, so opencode refuses the call and the model reads the refusal. A run
   that still asks is aborted. A run silent past the tool timeout plus three
   minutes is aborted as stuck, and one whose consumer walks away is aborted so
-  it stops spending. The binary and SDK are pinned to the same exact version;
-  bump them together.
+  it stops spending. opencode's HTTP API can read its config (which holds the
+  Infino key) and open a shell, so it takes a random password per boot; the
+  host's `OPENCODE_*` variables never reach it, and the Infino MCP child gets
+  only `PATH`, `HOME`, temp dirs and `INFINO_*` (`src/mcp-launcher.mjs`). A run
+  sends its question under an id it generates and counts only replies to that
+  question, so a previous run on the thread cannot end it. Chart receipts stay
+  under opencode's 51,200-byte output cut, or the chart could not be matched.
+  The binary and SDK are pinned to the same exact version; bump them together.
 - **Tool policy** (`agents/claude/src/index.ts`): under `dontAsk`, `allowedTools`
   only auto-approves; `disallowedTools` is what actually blocks. Host-
   reaching tools (Bash, file I/O) stay denied because the server process
@@ -149,7 +157,7 @@ Real, not theoretical. Do not paper over them with a comment; fix or flag.
 - **The OpenAI harness does not manage context.** `previous_response_id` grows
   the server-side conversation monotonically and `agents/openai/src/loop.ts`
   has no compaction. A long thread eventually fails the turn instead of
-  degrading. The Claude SDK handles this for the other harness.
+  degrading. The Claude SDK and opencode handle this for their harnesses.
 - **Tool output is unbounded into model context** on the OpenAI path.
   `mcp.call()` returns whatever the server sends. `create_chart` is safe (the
   model gets a 5-row receipt; full rows ride the side channel), but a wide

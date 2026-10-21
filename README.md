@@ -20,8 +20,8 @@ you already own:
 
 - **LLM seam** — a harness is any generator of `ChatEvent`s. Swap in your
   own model loop; the tools, chart contract, and persistence API do not
-  change. `packages/agents/` holds two worked examples (Claude, OpenAI) as
-  peers, both held to one conformance suite.
+  change. `packages/agents/` holds three worked examples (Claude, OpenAI,
+  opencode) as peers, all held to one conformance suite.
 - **Storage seam** — threads, visualizations, and dashboards persist
   through a `StorageAdapter` interface (SQLite by default). Implement it
   over your own database.
@@ -127,11 +127,11 @@ in a fork — the load-bearing contracts are spelled out there.
 persistent threads: transcripts survive restarts and a reopened thread resumes
 the model's context. The visualization/dashboard persistence API alongside it —
 saved charts with runtime filter and time-range injection at execute time,
-dashboards referencing them by id, stable REST shapes over HTTP. Two harnesses
-(Claude, and the OpenAI Responses API) drive the same UI unchanged, both held
-to one conformance suite, all on the same `StorageAdapter`.
+dashboards referencing them by id, stable REST shapes over HTTP. Three harnesses
+(Claude, the OpenAI Responses API, and opencode) drive the same UI unchanged,
+all held to one conformance suite and on the same `StorageAdapter`.
 
 **Known limitations.** The OpenAI harness does not compact context or bound
 large tool results, so long or data-heavy threads are weaker there than on
-Claude; see [Choosing between the bundled two](packages/analytics/README.md#choosing-between-the-bundled-two).
+Claude; see [Choosing between the bundled three](packages/analytics/README.md#choosing-between-the-bundled-three).
 There is no eval set, so answer *quality* across harnesses is unmeasured.
