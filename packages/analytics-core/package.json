@@ -14,5 +14,8 @@
   "dependencies": {
     "node-sql-parser": "^5.3.6",
     "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@infino-ai/mcp-server": "^0.16.0"
   }
 }

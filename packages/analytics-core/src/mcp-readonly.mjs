@@ -33,7 +33,11 @@ export const READ_TOOLS = new Set([
   "infino_token_match",
 ]);
 
-const KEEP_ENV = /^(PATH|HOME|TMPDIR|TEMP|TMP|SYSTEMROOT|INFINO_.+)$/;
+// Case-insensitive: Windows keeps each key's own case (Path, SystemRoot).
+// Proxy and CA settings stay, because the server's local embedder downloads
+// its model on first use, which a proxy or a TLS-inspecting CA must not break.
+const KEEP_ENV =
+  /^(PATH|HOME|USERPROFILE|TMPDIR|TEMP|TMP|SYSTEMROOT|HTTPS?_PROXY|ALL_PROXY|NO_PROXY|NODE_EXTRA_CA_CERTS|SSL_CERT_FILE|SSL_CERT_DIR|INFINO_.+)$/i;
 
 /** The environment the server may see. */
 export function serverEnv(env) {
@@ -59,10 +63,28 @@ export function screenRequest(message) {
   };
 }
 
-/** A tools/list result with everything outside READ_TOOLS removed. */
+const SQL_READ_ONLY_NOTE = "Read-only here: only SELECT and WITH queries run, and any write is refused.";
+
+/** A tools/list result with everything outside READ_TOOLS removed, and
+ * infino_sql described as the read-only tool it is behind this filter. */
 export function screenToolList(result) {
   if (!result || !Array.isArray(result.tools)) return result;
-  return { ...result, tools: result.tools.filter((tool) => READ_TOOLS.has(tool.name)) };
+  return { ...result, tools: result.tools.filter((tool) => READ_TOOLS.has(tool.name)).map(describeReadOnly) };
+}
+
+// The server describes infino_sql as accepting DDL and DML and marks it
+// destructive. Passed through, that invites the model to write and spend a
+// turn on each refusal.
+function describeReadOnly(tool) {
+  if (tool.name !== "infino_sql") return tool;
+  const description = String(tool.description ?? "")
+    .replace(/\s*Any single statement[^.]*\./i, "")
+    .trim();
+  return {
+    ...tool,
+    description: `${description} ${SQL_READ_ONLY_NOTE}`.trim(),
+    annotations: { ...tool.annotations, readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+  };
 }
 
 function run(entry) {
