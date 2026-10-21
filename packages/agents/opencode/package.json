@@ -1,0 +1,20 @@
+{
+  "name": "@infino-ai/analytics-agent-opencode",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "smoke": "node --import tsx src/smoke.ts"
+  },
+  "dependencies": {
+    "@infino-ai/analytics-core": "*",
+    "@infino-ai/mcp-server": "^0.12.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@opencode-ai/sdk": "1.19.2",
+    "opencode-ai": "1.19.2",
+    "zod": "^4.0.0"
+  }
+}
