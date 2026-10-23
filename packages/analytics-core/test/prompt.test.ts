@@ -13,6 +13,14 @@ describe("buildSystemPrompt", () => {
     }
   });
 
+  // The engine has no catalog views, so SQL discovery costs the agent a turn.
+  it("sends schema discovery to the tools in every variant", () => {
+    for (const prompt of [buildSystemPrompt(), buildSystemPrompt({ webSearch: true })]) {
+      match(prompt, /from the list-tables and describe-table tools/);
+      match(prompt, /no catalog views/);
+    }
+  });
+
   it("promises web search only to a harness that has it", () => {
     match(buildSystemPrompt({ webSearch: true }), /use web search to bring it in/);
     ok(!/web search/.test(buildSystemPrompt()));

@@ -2,6 +2,7 @@ import { createRequire } from "node:module";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import {
   InfinoClient,
+  MCP_READONLY_PROXY,
   buildSystemPrompt,
   drain,
   stepDetail,
@@ -142,14 +143,14 @@ async function* runAgent(params: {
       // agent's tool surface.
       strictMcpConfig: true,
       mcpServers: {
-        // The published @infino-ai/mcp-server, unmodified: list/describe
-        // tables, BM25/hybrid/semantic search, and read-only SQL. (Named
-        // "infino-engine" rather than "infino" so a host machine's per-name
-        // MCP enable/disable state for a server called "infino" can't
-        // silently disable it.)
+        // The published @infino-ai/mcp-server, behind the read-only filter:
+        // list/describe tables, BM25/hybrid/semantic search, and read-only
+        // SQL; its write tools never reach the agent. (Named "infino-engine"
+        // rather than "infino" so a host machine's per-name MCP enable/disable
+        // state for a server called "infino" can't silently disable it.)
         "infino-engine": {
           command: process.execPath,
-          args: [infinoMcpEntry],
+          args: [MCP_READONLY_PROXY, infinoMcpEntry],
           env: {
             INFINO_MCP_URI: client.databaseUri,
             INFINO_API_KEY: params.config.infino.apiKey ?? process.env.INFINO_API_KEY ?? "",

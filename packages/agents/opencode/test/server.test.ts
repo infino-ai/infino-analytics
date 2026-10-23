@@ -46,6 +46,12 @@ async function boot(mode = "", timing: StartOptions["timing"] = {}) {
   return { server, url: readFileSync(join(opts.dataDir, "url"), "utf8") };
 }
 
+/** Resolves once `condition` holds, or after `ms` either way. */
+async function until(condition: () => boolean, ms: number): Promise<void> {
+  const deadline = Date.now() + ms;
+  while (!condition() && Date.now() < deadline) await new Promise((r) => setTimeout(r, 10));
+}
+
 describe("startOpencode", () => {
   it("answers only requests carrying this boot's password", async () => {
     const { server, url } = await boot();
@@ -110,6 +116,9 @@ describe("startOpencode", () => {
     const next = events.next().catch(() => ({ done: true }));
     await fetch(`${url}/debug/exit`);
     strictEqual((await next).done, true);
+    // The socket closes a moment before Node reports the exit, so the stream
+    // can end first; the server must still read as dead once it has exited.
+    await until(() => !server.alive(), 2000);
     strictEqual(server.alive(), false);
   });
 

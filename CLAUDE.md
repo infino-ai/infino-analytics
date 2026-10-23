@@ -135,12 +135,19 @@ Break any of these and consumers break with you.
   minutes is aborted as stuck, and one whose consumer walks away is aborted so
   it stops spending. opencode's HTTP API can read its config (which holds the
   Infino key) and open a shell, so it takes a random password per boot; the
-  host's `OPENCODE_*` variables never reach it, and the Infino MCP child gets
-  only `PATH`, `HOME`, temp dirs and `INFINO_*` (`src/mcp-launcher.mjs`). A run
+  host's `OPENCODE_*` variables never reach it. A run
   sends its question under an id it generates and counts only replies to that
   question, so a previous run on the thread cannot end it. Chart receipts stay
   under opencode's 51,200-byte output cut, or the chart could not be matched.
   The binary and SDK are pinned to the same exact version; bump them together.
+- **The agent is read-only.** `@infino-ai/mcp-server` exposes its writes
+  (add/update/delete documents, create/drop tables) to any client and leaves
+  the limit to the API key's scope. Every harness therefore starts it through
+  `analytics-core/src/mcp-readonly.mjs`, which lists only `READ_TOOLS` and
+  refuses any other call before it reaches the server, so a tool a later
+  release adds stays unavailable until someone lists it. `infino_sql` stays on
+  the list because Infino Cloud's `query_sql` rejects writes itself. Adding a
+  tool to `READ_TOOLS` is a security decision: it must not change data.
 - **Tool policy** (`agents/claude/src/index.ts`): under `dontAsk`, `allowedTools`
   only auto-approves; `disallowedTools` is what actually blocks. Host-
   reaching tools (Bash, file I/O) stay denied because the server process

@@ -5,10 +5,17 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./conformance": "./src/harness-conformance.ts"
+    "./conformance": "./src/harness-conformance.ts",
+    "./mcp-readonly": {
+      "types": "./src/mcp-readonly.d.mts",
+      "default": "./src/mcp-readonly.mjs"
+    }
   },
   "dependencies": {
     "node-sql-parser": "^5.3.6",
     "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@infino-ai/mcp-server": "^0.16.0"
   }
 }
