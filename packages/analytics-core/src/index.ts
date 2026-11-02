@@ -1,4 +1,6 @@
 import { fileURLToPath } from "node:url";
+import type { EmbeddingConfig } from "./client.js";
+import { embeddingEnv } from "./embedding.js";
 import { QUERY_POLICY_ENV, policyPath } from "./query-policy.mjs";
 export {
   VizSpecSchema,
@@ -21,7 +23,9 @@ export { buildSystemPrompt } from "./prompt.js";
 export type { PromptCapabilities } from "./prompt.js";
 export type { AgentHarness, HarnessRunParams, HarnessRunResult } from "./harness.js";
 export { InfinoClient } from "./client.js";
-export type { InfinoConfig } from "./client.js";
+export type { InfinoConfig, EmbeddingConfig } from "./client.js";
+export { embeddingEnv, parseEmbeddingConfig, probeEmbedding } from "./embedding.js";
+export type { EmbeddingProbe } from "./embedding.js";
 export { execute } from "./execute.js";
 export { CREATE_CHART_INPUT, CREATE_CHART_DESCRIPTION, runCreateChart } from "./chart-tool.js";
 export type { CreateChartArgs } from "./chart-tool.js";
@@ -73,13 +77,23 @@ export type { QueryPolicy } from "./query-policy.mjs";
 
 /** The environment every harness starts the read-only filter with: the
  * database and its key, the deployment's query policy (FINO_QUERY_POLICY, as
- * an absolute path), and the server's INFINO_MCP_EMBED_* settings, so a table
- * whose vectors came from a remote model is searched with that same model.
- * Nothing else from this process reaches it. */
-export function mcpServerEnv(databaseUri: string, apiKey: string, env: NodeJS.ProcessEnv = process.env): Record<string, string> {
+ * an absolute path), and the embedder: `embedding` when set (see embeddingEnv),
+ * else the server's INFINO_MCP_EMBED_* settings, so a table whose vectors came
+ * from a remote model is searched with that same model. Nothing else from this
+ * process reaches it. */
+export function mcpServerEnv(
+  databaseUri: string,
+  apiKey: string,
+  embedding?: EmbeddingConfig,
+  env: NodeJS.ProcessEnv = process.env,
+): Record<string, string> {
   const out: Record<string, string> = { INFINO_MCP_URI: databaseUri, INFINO_API_KEY: apiKey };
-  for (const [key, value] of Object.entries(env)) {
-    if (/^INFINO_MCP_EMBED_/.test(key) && value) out[key] = value;
+  if (embedding) {
+    Object.assign(out, embeddingEnv(embedding));
+  } else {
+    for (const [key, value] of Object.entries(env)) {
+      if (/^INFINO_MCP_EMBED_/.test(key) && value) out[key] = value;
+    }
   }
   const policy = policyPath(env);
   if (policy) out[QUERY_POLICY_ENV] = policy;

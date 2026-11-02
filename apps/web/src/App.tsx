@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import ChatPage from "./ChatPage";
 import DashboardsPage from "./DashboardsPage";
+import SettingsPage from "./SettingsPage";
 import { Logo } from "@/components/ui/logo";
 
 // The app shell: header with the surface nav, and a tiny hash router — no
 // routing dependency, nothing for a fork to untangle. Routes:
 //   #/chat                 the conversational surface (default)
 //   #/dashboards[/:id]     dashboards list / a rendered dashboard
+//   #/settings             the agent's embedding model
 function useRoute(): string {
   const [hash, setHash] = useState(window.location.hash);
   useEffect(() => {
@@ -20,6 +22,7 @@ function useRoute(): string {
 const NAV = [
   { path: "/chat", label: "Fino" },
   { path: "/dashboards", label: "Dashboards" },
+  { path: "/settings", label: "Settings" },
 ];
 
 export default function App() {
@@ -47,6 +50,7 @@ export default function App() {
         <ChatPage />
       </div>
       {section === "/dashboards" && <DashboardsPage dashId={dashId} />}
+      {section === "/settings" && <SettingsPage />}
     </div>
   );
 }

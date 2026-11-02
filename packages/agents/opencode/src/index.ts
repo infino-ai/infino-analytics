@@ -103,6 +103,9 @@ export function createOpencodeHarness(config: OpencodeConfig, seams: OpencodeSea
       const current = (booting ??= start({
         infino: new InfinoClient(config.infino),
         infinoApiKey: config.infino.apiKey ?? process.env.INFINO_API_KEY ?? "",
+        // opencode starts its MCP servers once, so an embedder change applies
+        // when this server next boots.
+        infinoEmbedding: config.infino.embedding?.(),
         model,
         // No web-search tool on this path, so the contract must not offer one.
         systemPrompt: buildSystemPrompt({ domainContext: config.domainContext }),

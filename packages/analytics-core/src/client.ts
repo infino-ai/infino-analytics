@@ -7,6 +7,17 @@ export interface InfinoConfig {
   /** Hosted endpoint including database: https://<host>/<database> */
   uri: string;
   apiKey?: string;
+  /** The embedder the agent's semantic and hybrid search use, read at each
+   * run so a change applies to the next question. Unset means the MCP
+   * server's built-in local model. */
+  embedding?: () => EmbeddingConfig | undefined;
+}
+
+/** An embeddings endpoint in the common /embeddings format, such as a self-hosted TEI server. */
+export interface EmbeddingConfig {
+  /** Requests go to `<baseUrl>/embeddings`, so TEI's base ends in /v1. */
+  baseUrl: string;
+  model: string;
 }
 
 export class InfinoClient {

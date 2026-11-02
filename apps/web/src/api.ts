@@ -7,6 +7,8 @@
 import type {
   ChatEvent,
   Dashboard,
+  EmbeddingConfig,
+  EmbeddingProbe,
   ExecuteResult,
   NewVisualization,
   Thread,
@@ -16,6 +18,8 @@ import type {
 
 export type {
   ChatEvent,
+  EmbeddingConfig,
+  EmbeddingProbe,
   Thread,
   StoredMessage,
   Visualization,
@@ -163,4 +167,33 @@ export async function* chat(
       }
     }
   }
+}
+
+// ── the agent's embedder (settings page) ──────────────────────────────────
+
+export interface EmbeddingSettings {
+  embedding: EmbeddingConfig | null;
+  apiKeySet: boolean;
+}
+
+export async function getEmbedding(): Promise<EmbeddingSettings> {
+  return json(await fetch("/api/settings/embedding"));
+}
+
+export async function saveEmbedding(input: EmbeddingConfig | null): Promise<EmbeddingSettings> {
+  const res = await fetch("/api/settings/embedding", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input ?? { baseUrl: "" }),
+  });
+  return json(res);
+}
+
+export async function testEmbedding(input: EmbeddingConfig & { expectedDims?: number }): Promise<EmbeddingProbe> {
+  const res = await fetch("/api/settings/embedding/test", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return json(res);
 }

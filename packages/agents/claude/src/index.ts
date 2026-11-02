@@ -172,7 +172,11 @@ async function* runAgent(params: {
         "infino-engine": {
           command: process.execPath,
           args: [MCP_READONLY_PROXY, infinoMcpEntry],
-          env: mcpServerEnv(client.databaseUri, params.config.infino.apiKey ?? process.env.INFINO_API_KEY ?? ""),
+          env: mcpServerEnv(
+            client.databaseUri,
+            params.config.infino.apiKey ?? process.env.INFINO_API_KEY ?? "",
+            params.config.infino.embedding?.(),
+          ),
         },
         // In-process app tools: chart contract + grounding.
         fino: localTools,

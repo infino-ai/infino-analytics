@@ -52,7 +52,7 @@ describe("query policy verdicts", () => {
 
   it("passes the MCP server the policy path and embedding settings, nothing else", () => {
     deepStrictEqual(
-      mcpServerEnv("https://h/db", "k", {
+      mcpServerEnv("https://h/db", "k", undefined, {
         FINO_QUERY_POLICY: "policy.mjs",
         INFINO_MCP_EMBED_BASE_URL: "http://embed/v1",
         INFINO_MCP_EMBED_MODEL: "m",
@@ -67,6 +67,27 @@ describe("query policy verdicts", () => {
         FINO_QUERY_POLICY: `${process.cwd()}/policy.mjs`,
       },
     );
+  });
+
+  it("lets a chosen embedder replace the server's, without its API key for another host", () => {
+    const saved = { ...process.env };
+    try {
+      process.env.INFINO_MCP_EMBED_API_KEY = "secret";
+      process.env.INFINO_MCP_EMBED_BASE_URL = "http://embed/v1";
+      delete process.env.FINO_QUERY_POLICY;
+      deepStrictEqual(
+        mcpServerEnv("https://h/db", "k", { baseUrl: "https://elsewhere/v1", model: "other" }, process.env),
+        {
+          INFINO_MCP_URI: "https://h/db",
+          INFINO_API_KEY: "k",
+          INFINO_MCP_EMBED_PROVIDER: "openai",
+          INFINO_MCP_EMBED_BASE_URL: "https://elsewhere/v1",
+          INFINO_MCP_EMBED_MODEL: "other",
+        },
+      );
+    } finally {
+      process.env = saved;
+    }
   });
 });
 

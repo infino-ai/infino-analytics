@@ -96,6 +96,7 @@ export function createOpenAIHarness(config: OpenAIConfig, seams: OpenAISeams = {
     const mcp = await connect({
       databaseUri: infino.databaseUri,
       apiKey: config.infino.apiKey ?? process.env.INFINO_API_KEY ?? "",
+      embedding: config.infino.embedding?.(),
     });
     // Two teardown paths, one close: the finally below covers normal and
     // error exits, while abort covers a consumer that abandons this generator

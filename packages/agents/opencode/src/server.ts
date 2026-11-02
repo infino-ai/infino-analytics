@@ -5,7 +5,7 @@ import { createRequire } from "node:module";
 import { createServer, type AddressInfo } from "node:net";
 import { dirname, join, resolve } from "node:path";
 import { createOpencodeClient, type Config, type Event } from "@opencode-ai/sdk/v2";
-import { MCP_READONLY_PROXY, mcpServerEnv, type ChatEvent, type InfinoClient } from "@infino-ai/analytics-core";
+import { MCP_READONLY_PROXY, mcpServerEnv, type ChatEvent, type EmbeddingConfig, type InfinoClient } from "@infino-ai/analytics-core";
 import { ChartLedger, startChartServer } from "./charts.js";
 
 // The opencode server, owned by this package: the pinned binary from npm,
@@ -74,6 +74,8 @@ export interface OpencodeBackend {
 export interface StartOptions {
   infino: InfinoClient;
   infinoApiKey: string;
+  /** Overrides the server's INFINO_MCP_EMBED_* embedder. */
+  infinoEmbedding?: EmbeddingConfig;
   /** "<provider>/<model>", as opencode names it. */
   model: string;
   systemPrompt: string;
@@ -200,7 +202,7 @@ export async function startOpencode(opts: StartOptions): Promise<OpencodeServer>
           // opencode passes down, model keys included, to what the Infino
           // server needs.
           command: [process.execPath, MCP_READONLY_PROXY, infinoMcpEntry],
-          environment: mcpServerEnv(opts.infino.databaseUri, opts.infinoApiKey),
+          environment: mcpServerEnv(opts.infino.databaseUri, opts.infinoApiKey, opts.infinoEmbedding),
           timeout: opts.mcpTimeoutMs,
         },
         [CHART_MCP]: { type: "remote", url: charts.url, oauth: false, timeout: opts.mcpTimeoutMs },
