@@ -8,6 +8,9 @@
 //   GET    /api/threads/:id/messages  → { messages } the persisted transcript
 //   DELETE /api/threads/:id           → 204
 //   POST   /api/chat                  → SSE stream of ChatEvents ({ threadId, question })
+//   GET    /api/settings/embedding    → { embedding, apiKeySet } the agent's embedder
+//   PUT    /api/settings/embedding    { baseUrl, model } sets it; empty baseUrl resets
+//   POST   /api/settings/embedding/test → probe { baseUrl, model, expectedDims? }
 //   GET    /*                         → the demo web UI (when built)
 //
 // Persistence surface (REST with envelope responses
@@ -32,7 +35,13 @@ import { join, dirname, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
-import { Analytics, type AgentHarness } from "@infino-ai/analytics";
+import {
+  Analytics,
+  parseEmbeddingConfig,
+  probeEmbedding,
+  type AgentHarness,
+  type EmbeddingConfig,
+} from "@infino-ai/analytics";
 import { SqliteStorage } from "@infino-ai/analytics-storage-sqlite";
 
 function requireEnv(name: string): string {
@@ -70,6 +79,23 @@ const storage = new SqliteStorage({ path: process.env.FINO_DB ?? "./data/analyti
 // one entry below plus one line in .env.example.
 const INFINO_URI = requireEnv("INFINO_URI");
 
+// The embedder for the agent's semantic and hybrid search. The settings page
+// changes it for the next question and the change lasts until restart; set
+// INFINO_MCP_EMBED_BASE_URL and INFINO_MCP_EMBED_MODEL to keep it.
+let embedding: EmbeddingConfig | undefined;
+if (process.env.INFINO_MCP_EMBED_BASE_URL) {
+  try {
+    embedding = parseEmbeddingConfig({
+      baseUrl: process.env.INFINO_MCP_EMBED_BASE_URL,
+      model: process.env.INFINO_MCP_EMBED_MODEL,
+    });
+  } catch (err) {
+    console.error(`INFINO_MCP_EMBED_*: ${(err as Error).message}`);
+    process.exit(1);
+  }
+}
+const INFINO = { uri: INFINO_URI, embedding: () => embedding };
+
 // Shared by whichever harness runs: dataset notes and the turn ceiling mean
 // the same thing to all of them. The cost ceilings do not, so they live per
 // entry.
@@ -84,7 +110,7 @@ const MAX_TURNS = numberEnv("FINO_MAX_TURNS");
 const HARNESSES: Record<string, () => Promise<AgentHarness>> = {
   claude: async () =>
     (await import("@infino-ai/analytics-agent-claude")).createClaudeHarness({
-      infino: { uri: INFINO_URI },
+      infino: INFINO,
       model: process.env.FINO_MODEL,
       maxTurns: MAX_TURNS,
       maxBudgetUsd: numberEnv("FINO_MAX_BUDGET_USD"),
@@ -99,7 +125,7 @@ const HARNESSES: Record<string, () => Promise<AgentHarness>> = {
       process.exit(1);
     }
     return (await import("@infino-ai/analytics-agent-openai")).createOpenAIHarness({
-      infino: { uri: INFINO_URI },
+      infino: INFINO,
       maxTurns: MAX_TURNS,
       maxTotalTokens: numberEnv("FINO_MAX_TOTAL_TOKENS"),
       domainContext: DOMAIN_CONTEXT,
@@ -108,7 +134,7 @@ const HARNESSES: Record<string, () => Promise<AgentHarness>> = {
   },
   opencode: async () =>
     (await import("@infino-ai/analytics-agent-opencode")).createOpencodeHarness({
-      infino: { uri: INFINO_URI },
+      infino: INFINO,
       model: process.env.OPENCODE_MODEL,
       maxTurns: MAX_TURNS,
       maxBudgetUsd: numberEnv("FINO_MAX_BUDGET_USD"),
@@ -166,6 +192,41 @@ app.get("/api/threads/:id/messages", async (c) => {
 app.delete("/api/threads/:id", async (c) => {
   await analytics.threads.delete(c.req.param("id"));
   return c.body(null, 204);
+});
+
+// Embedder settings. The API key stays in the server's environment
+// (INFINO_MCP_EMBED_API_KEY) and is sent only to INFINO_MCP_EMBED_BASE_URL's
+// host; responses only say whether one is set. Like every route here, these
+// have no auth, so the server belongs on a trusted network.
+const embeddingView = () => ({
+  embedding: embedding ?? null,
+  apiKeySet: Boolean(process.env.INFINO_MCP_EMBED_API_KEY),
+});
+app.get("/api/settings/embedding", (c) => c.json(embeddingView()));
+app.put("/api/settings/embedding", async (c) => {
+  const body = await c.req.json().catch(() => null);
+  if (body === null || typeof body !== "object") return c.json({ error: "body must be a JSON object" }, 400);
+  if (body.baseUrl === "" || body.baseUrl == null) {
+    embedding = undefined;
+    return c.json(embeddingView());
+  }
+  try {
+    embedding = parseEmbeddingConfig(body);
+  } catch (err) {
+    return c.json({ error: (err as Error).message }, 400);
+  }
+  return c.json(embeddingView());
+});
+app.post("/api/settings/embedding/test", async (c) => {
+  const body = await c.req.json().catch(() => null);
+  let candidate: EmbeddingConfig;
+  try {
+    candidate = parseEmbeddingConfig(body);
+  } catch (err) {
+    return c.json({ error: (err as Error).message }, 400);
+  }
+  const expectedDims = Number(body?.expectedDims) || undefined;
+  return c.json(await probeEmbedding(candidate, { expectedDims }));
 });
 
 // Suggestion chips for the demo UI. Deployment-specific: set FINO_SUGGESTIONS

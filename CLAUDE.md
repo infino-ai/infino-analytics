@@ -19,7 +19,10 @@ The server needs `INFINO_URI` (https://<host>/<database>), `INFINO_API_KEY`,
 and `ANTHROPIC_API_KEY`. Optional: `FINO_MODEL`, `FINO_DB` (SQLite path),
 `FINO_SUGGESTIONS` (pipe-separated question chips), `FINO_DOMAIN_CONTEXT`
 (operator notes about the dataset, appended to the agent's system prompt),
-`FINO_MAX_TURNS` (per-question turn ceiling), `PORT`. `FINO_HARNESS` picks the
+`FINO_MAX_TURNS` (per-question turn ceiling), `INFINO_MCP_EMBED_BASE_URL` and
+`INFINO_MCP_EMBED_MODEL` (the embedder for semantic and hybrid search; the
+Settings page changes it until restart, and opencode picks a change up only
+when it reboots), `INFINO_MCP_EMBED_API_KEY`, `PORT`. `FINO_HARNESS` picks the
 harness and is required — `claude`, `openai` or `opencode`, no default. `openai` needs `OPENAI_BASE_URL`,
 `OPENAI_API_KEY`, and `OPENAI_MODEL` instead of `ANTHROPIC_API_KEY`, and takes
 an optional `OPENAI_REASONING_EFFORT` (none/low/medium/high). `opencode` needs
