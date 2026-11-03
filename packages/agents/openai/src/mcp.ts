@@ -19,6 +19,8 @@ export interface McpToolset {
 export interface McpOptions {
   databaseUri: string;
   apiKey: string;
+  /** Extra server environment, such as the embedder's. */
+  env?: Record<string, string>;
   /** Test seam: an alternative server entry point. */
   entry?: string;
 }
@@ -32,7 +34,7 @@ export async function connectInfinoMcp(opts: McpOptions): Promise<McpToolset> {
     args: [MCP_READONLY_PROXY, entry],
     // HOME is merged in by the SDK's default env and matters: the server's
     // local embedder caches its model there.
-    env: { INFINO_MCP_URI: opts.databaseUri, INFINO_API_KEY: opts.apiKey },
+    env: { INFINO_MCP_URI: opts.databaseUri, INFINO_API_KEY: opts.apiKey, ...opts.env },
     stderr: "pipe",
   });
   const client = new Client({ name: "fino-openai", version: "0.0.0" });

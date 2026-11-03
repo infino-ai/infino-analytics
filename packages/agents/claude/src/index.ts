@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import {
+  embeddingEnv,
   InfinoClient,
   MCP_READONLY_PROXY,
   buildSystemPrompt,
@@ -154,6 +155,7 @@ async function* runAgent(params: {
           env: {
             INFINO_MCP_URI: client.databaseUri,
             INFINO_API_KEY: params.config.infino.apiKey ?? process.env.INFINO_API_KEY ?? "",
+            ...embeddingEnv(params.config.infino.embedding?.()),
           },
         },
         // In-process app tools: chart contract + grounding.

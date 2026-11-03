@@ -31,7 +31,9 @@ const RULES = [
 // The MCP SDK is transport, not a provider, and every harness speaks it.
 // OPENCODE_DISABLE_CLAUDE_CODE is opencode's own switch for its instruction-
 // file compatibility; the name is opencode's, not a reference to a peer.
-const EXEMPT = /@modelcontextprotocol|OPENCODE_DISABLE_CLAUDE_CODE\b/;
+// INFINO_MCP_EMBED_PROVIDER: "openai" is the MCP server's own value for any
+// endpoint in the common /embeddings format; it names no harness.
+const EXEMPT = /@modelcontextprotocol|OPENCODE_DISABLE_CLAUDE_CODE\b|INFINO_MCP_EMBED_PROVIDER: "openai"/;
 
 /** Empty when the directory is absent — a fork deleting the harness it did not
  * pick is a supported state, not a failing rule. */

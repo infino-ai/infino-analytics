@@ -74,6 +74,8 @@ export interface OpencodeBackend {
 export interface StartOptions {
   infino: InfinoClient;
   infinoApiKey: string;
+  /** Extra Infino MCP server environment, such as the embedder's. */
+  infinoEnv?: Record<string, string>;
   /** "<provider>/<model>", as opencode names it. */
   model: string;
   systemPrompt: string;
@@ -200,7 +202,7 @@ export async function startOpencode(opts: StartOptions): Promise<OpencodeServer>
           // opencode passes down, model keys included, to what the Infino
           // server needs.
           command: [process.execPath, MCP_READONLY_PROXY, infinoMcpEntry],
-          environment: { INFINO_MCP_URI: opts.infino.databaseUri, INFINO_API_KEY: opts.infinoApiKey },
+          environment: { INFINO_MCP_URI: opts.infino.databaseUri, INFINO_API_KEY: opts.infinoApiKey, ...opts.infinoEnv },
           timeout: opts.mcpTimeoutMs,
         },
         [CHART_MCP]: { type: "remote", url: charts.url, oauth: false, timeout: opts.mcpTimeoutMs },
