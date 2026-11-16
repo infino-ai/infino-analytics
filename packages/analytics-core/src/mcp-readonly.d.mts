@@ -8,4 +8,9 @@ export function screenRequest(
   message: unknown,
 ): { forward: true } | { forward: false; reply: { jsonrpc: "2.0"; id: unknown; result: unknown } };
 
+export function screenCall(
+  message: unknown,
+  policy: import("./query-policy.mjs").QueryPolicy | null,
+): Promise<{ jsonrpc: "2.0"; id: unknown; result: unknown } | null>;
+
 export function screenToolList<T extends { tools?: { name: string }[] }>(result: T): T;

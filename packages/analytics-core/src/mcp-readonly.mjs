@@ -10,6 +10,9 @@
 // infino_sql stays: Infino Cloud's query_sql endpoint, which it uses, accepts
 // only reads.
 //
+// A read call then passes the deployment's query policy, when FINO_QUERY_POLICY
+// names one (query-policy.mjs); a refused call never reaches the server.
+//
 // The server also gets only the environment it needs. Harness processes hold
 // model provider keys, and none of those belong in the process that runs the
 // agent's queries.
@@ -20,6 +23,7 @@ import { spawn } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
+import { checkQuery, loadQueryPolicy, refusalText } from "./query-policy.mjs";
 
 export const READ_TOOLS = new Set([
   "infino_list_tables",
@@ -63,6 +67,20 @@ export function screenRequest(message) {
   };
 }
 
+/** The deployment's query policy (query-policy.mjs) on a read call the
+ * filter would forward: null to forward it, or the refusal to answer with. */
+export async function screenCall(message, policy) {
+  if (!policy || message?.method !== "tools/call") return null;
+  const name = message.params?.name;
+  const reason = await checkQuery(policy, name, message.params?.arguments);
+  if (!reason) return null;
+  return {
+    jsonrpc: "2.0",
+    id: message.id,
+    result: { content: [{ type: "text", text: refusalText(name, reason) }], isError: true },
+  };
+}
+
 const SQL_READ_ONLY_NOTE = "Read-only here: only SELECT and WITH queries run, and any write is refused.";
 
 /** A tools/list result with everything outside READ_TOOLS removed, and
@@ -87,12 +105,15 @@ function describeReadOnly(tool) {
   };
 }
 
-function run(entry) {
+function run(entry, policy) {
   const child = spawn(process.execPath, [entry], { stdio: ["pipe", "pipe", "inherit"], env: serverEnv(process.env) });
   const listRequests = new Set();
   const send = (stream, message) => stream.write(`${JSON.stringify(message)}\n`);
 
-  createInterface({ input: process.stdin }).on("line", (line) => {
+  // Lines are screened one after another: the policy may be async, and the
+  // server must still see messages in the order the client sent them.
+  let queue = Promise.resolve();
+  const screenLine = async (line) => {
     let parsed;
     try {
       parsed = JSON.parse(line);
@@ -106,15 +127,24 @@ function run(entry) {
     const forwarded = [];
     for (const message of messages) {
       const verdict = screenRequest(message);
-      if (!verdict.forward) {
-        send(process.stdout, verdict.reply);
+      const refusal = verdict.forward ? await screenCall(message, policy) : verdict.reply;
+      if (refusal) {
+        send(process.stdout, refusal);
         continue;
       }
       if (message?.method === "tools/list" && message.id !== undefined) listRequests.add(message.id);
       forwarded.push(message);
     }
     if (forwarded.length > 0) send(child.stdin, Array.isArray(parsed) ? forwarded : forwarded[0]);
-  }).on("close", () => child.stdin.end());
+  };
+
+  createInterface({ input: process.stdin })
+    .on("line", (line) => {
+      queue = queue.then(() => screenLine(line));
+    })
+    .on("close", () => {
+      queue = queue.then(() => child.stdin.end());
+    });
 
   createInterface({ input: child.stdout }).on("line", (line) => {
     let parsed;
@@ -152,5 +182,13 @@ if (isMain) {
     console.error("usage: node mcp-readonly.mjs <mcp server entry>");
     process.exit(2);
   }
-  run(entry);
+  // FINO_QUERY_POLICY, when set, must load: serving without it would drop the
+  // guard the deployment asked for.
+  loadQueryPolicy().then(
+    (policy) => run(entry, policy),
+    (err) => {
+      console.error(`could not load the query policy: ${err instanceof Error ? err.message : String(err)}`);
+      process.exit(2);
+    },
+  );
 }

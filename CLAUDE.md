@@ -148,6 +148,14 @@ Break any of these and consumers break with you.
   release adds stays unavailable until someone lists it. `infino_sql` stays on
   the list because Infino Cloud's `query_sql` rejects writes itself. Adding a
   tool to `READ_TOOLS` is a security decision: it must not change data.
+- **A deployment may add a query policy** (`FINO_QUERY_POLICY`,
+  `analytics-core/src/query-policy.mjs`): a module that sees every MCP call in
+  the read-only filter and every `create_chart` SQL, and returns a reason to
+  refuse. It fails closed: a policy that throws refuses the call, and one that
+  is configured but cannot load stops the filter from starting and refuses
+  every chart. Harnesses start the filter with `mcpServerEnv()`, which carries
+  the policy path and the server's `INFINO_MCP_EMBED_*` settings and nothing
+  else; a new harness must use it too.
 - **Tool policy** (`agents/claude/src/index.ts`): under `dontAsk`, `allowedTools`
   only auto-approves; `disallowedTools` is what actually blocks. Host-
   reaching tools (Bash, file I/O) stay denied because the server process

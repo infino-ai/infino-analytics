@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+import { QUERY_POLICY_ENV, policyPath } from "./query-policy.mjs";
 export {
   VizSpecSchema,
   SqlSourceSchema,
@@ -66,3 +67,21 @@ export type { ExecuteOptions } from "./execute.js";
  * through: `node <MCP_READONLY_PROXY> <server entry>`. Only read tools reach
  * the agent; see mcp-readonly.mjs. */
 export const MCP_READONLY_PROXY = fileURLToPath(new URL("./mcp-readonly.mjs", import.meta.url));
+
+export { QUERY_POLICY_ENV, checkQuery, loadQueryPolicy, refusalText } from "./query-policy.mjs";
+export type { QueryPolicy } from "./query-policy.mjs";
+
+/** The environment every harness starts the read-only filter with: the
+ * database and its key, the deployment's query policy (FINO_QUERY_POLICY, as
+ * an absolute path), and the server's INFINO_MCP_EMBED_* settings, so a table
+ * whose vectors came from a remote model is searched with that same model.
+ * Nothing else from this process reaches it. */
+export function mcpServerEnv(databaseUri: string, apiKey: string, env: NodeJS.ProcessEnv = process.env): Record<string, string> {
+  const out: Record<string, string> = { INFINO_MCP_URI: databaseUri, INFINO_API_KEY: apiKey };
+  for (const [key, value] of Object.entries(env)) {
+    if (/^INFINO_MCP_EMBED_/.test(key) && value) out[key] = value;
+  }
+  const policy = policyPath(env);
+  if (policy) out[QUERY_POLICY_ENV] = policy;
+  return out;
+}
