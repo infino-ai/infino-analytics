@@ -58,6 +58,16 @@ function numberEnv(name: string): number | undefined {
   return n;
 }
 
+// FINO_WEB_SEARCH=off keeps the claude harness off the web; unset means on.
+// Anything other than on/off stops the boot, so a typo cannot leave it on.
+function webSearchEnv(): boolean {
+  const v = process.env.FINO_WEB_SEARCH;
+  if (!v || v === "on") return true;
+  if (v === "off") return false;
+  console.error(`FINO_WEB_SEARCH must be on or off (got ${v})`);
+  process.exit(1);
+}
+
 const PORT = numberEnv("PORT") ?? 8787;
 
 // The storage seam, wired: this line decides where app state lives. Swap
@@ -89,6 +99,7 @@ const HARNESSES: Record<string, () => Promise<AgentHarness>> = {
       maxTurns: MAX_TURNS,
       maxBudgetUsd: numberEnv("FINO_MAX_BUDGET_USD"),
       domainContext: DOMAIN_CONTEXT,
+      webSearch: webSearchEnv(),
     }),
   openai: async () => {
     // Checked inside this entry so an OPENAI_* typo cannot fail a claude boot.

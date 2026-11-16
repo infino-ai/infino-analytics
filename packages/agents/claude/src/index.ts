@@ -27,7 +27,11 @@ export type { ChatEvent } from "@infino-ai/analytics-core";
 //     host, so they carry none of the credential risk the host tools do.
 //     (WebFetch retrieves model-chosen URLs — an SSRF surface; a hardened
 //     deployment behind internal services may drop it.)
-const ALLOWED_TOOLS = ["mcp__infino-engine__*", "mcp__fino__*", "WebSearch", "WebFetch"];
+//     `webSearch: false` turns both off: they move to the denied list, since
+//     leaving them unlisted would not block them, and the prompt stops
+//     offering outside context.
+const CORE_TOOLS = ["mcp__infino-engine__*", "mcp__fino__*"];
+const WEB_TOOLS = ["WebSearch", "WebFetch"];
 
 // DENIED regardless of the above. Under "dontAsk", allowedTools only
 // AUTO-APPROVES its entries — it does NOT gate the SDK's other built-ins
@@ -77,6 +81,23 @@ export interface AgentConfig {
    * to the system prompt so the agent aligns its definitions with the
    * deployment's instead of inventing its own. */
   domainContext?: string;
+  /** Let the agent use WebSearch and WebFetch (default true). Set false for a
+   * deployment whose answers must come from the database alone, or that
+   * should not reach model-chosen URLs. */
+  webSearch?: boolean;
+}
+
+/** The SDK tool lists for a config: web tools are auto-approved when on and
+ * denied when off, never merely unlisted. */
+export function toolPolicy(config: Pick<AgentConfig, "webSearch">): {
+  allowedTools: string[];
+  disallowedTools: string[];
+} {
+  const web = config.webSearch ?? true;
+  return {
+    allowedTools: web ? [...CORE_TOOLS, ...WEB_TOOLS] : [...CORE_TOOLS],
+    disallowedTools: web ? [...DENIED_TOOLS] : [...DENIED_TOOLS, ...WEB_TOOLS],
+  };
 }
 
 export interface AgentRunResult {
@@ -123,9 +144,9 @@ async function* runAgent(params: {
     prompt: params.question,
     options: {
       model: params.config.model ?? DEFAULT_MODEL,
-      // This harness auto-approves WebSearch/WebFetch (see ALLOWED_TOOLS).
+      // Web tools follow config.webSearch (see toolPolicy).
       systemPrompt: buildSystemPrompt({
-        webSearch: true,
+        webSearch: params.config.webSearch ?? true,
         domainContext: params.config.domainContext,
       }),
       maxTurns: params.config.maxTurns ?? DEFAULT_MAX_TURNS,
@@ -137,8 +158,7 @@ async function* runAgent(params: {
       // repo settings from wherever the server happens to run.
       settingSources: [],
       permissionMode: "dontAsk",
-      allowedTools: ALLOWED_TOOLS,
-      disallowedTools: DENIED_TOOLS,
+      ...toolPolicy(params.config),
       // Use exactly the servers configured here — user/project MCP settings
       // on the host machine must not leak into (or disable parts of) the
       // agent's tool surface.
