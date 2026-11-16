@@ -4,6 +4,7 @@ import {
   InfinoClient,
   MCP_READONLY_PROXY,
   buildSystemPrompt,
+  mcpServerEnv,
   drain,
   stepDetail,
   stepResult,
@@ -151,10 +152,7 @@ async function* runAgent(params: {
         "infino-engine": {
           command: process.execPath,
           args: [MCP_READONLY_PROXY, infinoMcpEntry],
-          env: {
-            INFINO_MCP_URI: client.databaseUri,
-            INFINO_API_KEY: params.config.infino.apiKey ?? process.env.INFINO_API_KEY ?? "",
-          },
+          env: mcpServerEnv(client.databaseUri, params.config.infino.apiKey ?? process.env.INFINO_API_KEY ?? ""),
         },
         // In-process app tools: chart contract + grounding.
         fino: localTools,

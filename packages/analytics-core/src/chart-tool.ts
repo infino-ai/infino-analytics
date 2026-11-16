@@ -3,6 +3,19 @@ import { CHART_TYPES, VizSpecSchema, type ExecuteResult, type VizSpec } from "./
 import { execute } from "./execute.js";
 import type { InfinoClient } from "./client.js";
 import type { ChatEvent } from "./events.js";
+import { checkQuery, loadQueryPolicy, refusalText, type QueryPolicy } from "./query-policy.mjs";
+
+// The deployment's query policy (FINO_QUERY_POLICY), loaded on the first
+// chart. A policy that is configured but fails to load refuses every chart
+// rather than letting them through unguarded.
+let policyLoad: Promise<QueryPolicy | null> | undefined;
+function queryPolicy(): Promise<QueryPolicy | null> {
+  policyLoad ??= loadQueryPolicy().catch((err: unknown) => {
+    const message = err instanceof Error ? err.message : String(err);
+    return () => `the query policy did not load (${message})`;
+  });
+  return policyLoad;
+}
 
 // The chart contract as a tool, harness-agnostic: schema, description, and
 // the run body. No LLM SDK is imported here — each harness wraps these in
@@ -61,6 +74,9 @@ export async function runCreateChart(
     return { ok: false, error: `invalid chart spec: ${parsed.error.message.slice(0, 400)}` };
   }
   const spec: VizSpec = parsed.data;
+
+  const refused = await checkQuery(await queryPolicy(), "create_chart", { table: args.table, sql: args.sql });
+  if (refused) return { ok: false, error: refusalText("create_chart", refused) };
 
   emit({ type: "sql", query: spec.source.raw_query });
 
