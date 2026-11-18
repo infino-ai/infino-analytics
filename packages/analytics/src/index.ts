@@ -46,8 +46,12 @@ export type {
   TimeRange,
   NewVisualization,
   NewDashboard,
+  EmbeddingConfig,
+  EmbeddingProbe,
 } from "@infino-ai/analytics-core";
 export {
+  parseEmbeddingConfig,
+  probeEmbedding,
   InMemoryStorage,
   VisualizationSchema,
   DashboardSchema,

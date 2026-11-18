@@ -1,7 +1,7 @@
 import { createRequire } from "node:module";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { MCP_READONLY_PROXY, mcpServerEnv } from "@infino-ai/analytics-core";
+import { type EmbeddingConfig, MCP_READONLY_PROXY, mcpServerEnv } from "@infino-ai/analytics-core";
 import type { FunctionTool } from "openai/resources/responses/responses";
 
 // The data tools, from the published @infino-ai/mcp-server over stdio. This
@@ -19,6 +19,8 @@ export interface McpToolset {
 export interface McpOptions {
   databaseUri: string;
   apiKey: string;
+  /** Overrides the server's INFINO_MCP_EMBED_* embedder. */
+  embedding?: EmbeddingConfig;
   /** Test seam: an alternative server entry point. */
   entry?: string;
 }
@@ -32,7 +34,7 @@ export async function connectInfinoMcp(opts: McpOptions): Promise<McpToolset> {
     args: [MCP_READONLY_PROXY, entry],
     // HOME is merged in by the SDK's default env and matters: the server's
     // local embedder caches its model there.
-    env: mcpServerEnv(opts.databaseUri, opts.apiKey),
+    env: mcpServerEnv(opts.databaseUri, opts.apiKey, opts.embedding),
     stderr: "pipe",
   });
   const client = new Client({ name: "fino-openai", version: "0.0.0" });
